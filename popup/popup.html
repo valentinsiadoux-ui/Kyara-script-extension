@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Kyara Scripts</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #17171f; --fg: #ececf1; --mut: #9a9aab; --line: #2f2f3b; --acc: #8b7bff; --ok: #4ad991; --warn: #ffb347; }
+    @media (prefers-color-scheme: light) { :root { --bg: #fff; --fg: #1b1b24; --mut: #666678; --line: #e1e1ea; --ok: #138a52; --warn: #b36b00; } }
+    body { margin: 0; width: 300px; padding: 14px; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; }
+    h1 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+    h1 img { width: 20px; height: 20px; }
+    #state { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); }
+    #state.ok { border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+    #state.warn { border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
+    #state b { display: block; margin-bottom: 2px; }
+    #state.ok b { color: var(--ok); }
+    #state.warn b { color: var(--warn); }
+    #state p { margin: 0; color: var(--mut); }
+    button { margin-top: 10px; width: 100%; padding: 8px; border: 0; border-radius: 8px; background: var(--acc); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <h1><img src="../icons/icon32.png" alt="">Kyara Scripts</h1>
+  <div id="state"><b>Vérification…</b></div>
+  <button id="action" type="button" hidden></button>
+  <script src="popup.js"></script>
+</body>
+</html>
