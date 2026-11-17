@@ -90,6 +90,8 @@
     id: "proposer-offres",
     name: "Offres d'échange",
     icon: "⇄",
+    category: "Échanges",
+    short: "Doublons contre cartes manquantes",
     description: "Publie des offres d'échange avec mes doublons contre des cartes qui me manquent, de rareté égale ou supérieure.",
     params: [
       { key: "totalOffers", label: "Offres à publier au total", type: "number", default: 20, min: 1, max: 500 },

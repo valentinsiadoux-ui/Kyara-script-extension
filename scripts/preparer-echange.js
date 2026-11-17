@@ -248,7 +248,9 @@
   K.register({
     id: "preparer-echange",
     name: "Préparer un échange",
-    icon: "⇄",
+    icon: "🤝",
+    category: "Échanges",
+    short: "Remplit l'échange direct ouvert",
     description:
       "Prépare des doubles manquants avec raretés communes, équilibrage ou achat en chakra. Envoi manuel.",
     skipPreview: true,

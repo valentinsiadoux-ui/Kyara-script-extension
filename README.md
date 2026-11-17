@@ -1,7 +1,8 @@
 # Kyara Scripts — extension navigateur
 
 Ajoute sur https://kyara.games un menu déroulant « K Scripts » flottant en haut à droite, par-dessus
-la page (juste sous le header). Chaque script du menu ouvre un popover en trois étapes :
+la page (juste sous le header). Les scripts y sont rangés par rubrique (Marché, Échanges, Comptoir), sur une ligne
+courte chacun (la description complète s'affiche au survol). Chaque script du menu ouvre un popover en trois étapes :
 
 1. **Réglages** : les paramètres du script (mémorisés d'une fois sur l'autre, « Valeurs par défaut » pour revenir en arrière).
 2. **Aperçu** : lecture seule, rien n'est publié. Tableau de ce que le script va faire ; décoche une ligne pour l'exclure.
@@ -42,6 +43,8 @@ ui/content.js        menu flottant + popover
     id: "mon-script",
     name: "Mon script",
     icon: "★",
+    category: "Marché",                            // rubrique du menu (Marché, Échanges, Comptoir ou une nouvelle)
+    short: "Ligne courte du menu",
     description: "Ce que fait le script.",
     params: [
       { key: "max", label: "Nombre max", type: "number", default: 10, min: 1, max: 100 },
@@ -99,6 +102,38 @@ ui/content.js        menu flottant + popover
 ⚠ Comme dans les scripts d'origine, les endpoints de **création** (offre d'échange, annonce d'enchère) et
 leur corps de requête sont déduits, pas vérifiés : contrôle la première publication dans F12 > Réseau,
 et corrige l'endpoint dans « Réglages avancés » ou `buildBody` dans le fichier du script.
+
+## Vendre mes doublons
+
+**K Scripts → Vendre mes doublons** met des doublons en vente au marché (prix fixe ou enchère). Une rangée
+de boutons choisit le prix par rapport à la **référence** (médiane 7 j par défaut, ou 30 j, ou dernière vente) :
+
+- **💎 Chère** 125 % · **⚖️ Marché** 100 % · **💸 Abordable** 85 % · **⚡ Liquidation** 60 % (pourcentages modifiables dans « Réglages avancés ») ;
+- **🎯 Concurrentiel** : 1 ◆ (réglable) sous l'annonce à prix fixe la moins chère des autres vendeurs, jamais sous 70 % de la référence ;
+- **✏️ Perso** : le pourcentage de ton choix.
+
+Les cartes les plus chères passent en premier, jusqu'au nombre d'annonces max par lancement (une annonce par exemplaire).
+Le prix est borné par la fourchette du site (`/fair-play/bounds`) et le prix de recyclage. L'aperçu montre pour chaque carte
+la référence, l'annonce concurrente la moins chère, le meilleur ordre d'achat (une annonce à ce prix ou moins part
+tout de suite), le prix, l'écart à la référence et le net après taxe et frais. Les cartes épinglées, déjà en vente
+ou proposées dans une offre d'échange ouverte sont laissées de côté.
+
+## Poster une annonce au comptoir
+
+**K Scripts → Poster une annonce** : une rangée de boutons choisit le modèle, le message est rédigé
+automatiquement, l'aperçu le montre tel quel, puis **Confirmer et lancer** le publie au comptoir
+(`/marche/chat`) :
+
+- **💰 Je vends** : « Je vends tous mes doublons ⚪🟢🔵 à -40% du prix de la médiane (+4 000 doublons) ! »
+- **🛒 J'achète** : « J'achète toutes vos cartes 🟣🟡 à -30% du prix de la médiane ! »
+- **🔁 J'échange** : « J'échange mes doublons ⚪🟢🔵 (+4 000 doublons) contre vos doublons 🟣🟡 que je n'ai pas, à valeur de chakra équivalente ! »
+- **🔎 Je cherche** : « Je cherche Frieren, Power ! » ; avec une seule carte, elle est jointe (bouton « Faire une offre » sur le site).
+- **✏️ Libre** : le texte saisi tel quel.
+
+Le nombre de doublons est compté dans ta collection pour les raretés choisies et arrondi. Un « Texte en plus »
+s'ajoute à la fin de chaque modèle. L'aperçu bloque l'envoi si le site refuse tes messages (Discord non lié,
+pas assez de boosters ouverts, sourdine) ou si le message dépasse la longueur permise (300 caractères).
+Salon : celui que le site t'attribue, ou un salon précis dans « Réglages avancés ».
 
 ## Préparer un échange direct
 

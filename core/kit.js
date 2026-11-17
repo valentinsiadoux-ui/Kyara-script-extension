@@ -3,8 +3,10 @@
  *
  * Un script s'enregistre avec KyaraExt.register({ ... }) :
  *   id, name, icon, description
- *   params  : [{ key, label, type, default, help, group, min, max, step, options }]
- *             type = "number" | "boolean" | "select" | "text" | "rarityMap"
+ *   category, short : rubrique du menu et ligne courte affichée dessous (description en infobulle)
+ *   params  : [{ key, label, type, default, help, group, min, max, step, options, optional, enabledWhen }]
+ *             type = "number" | "boolean" | "select" | "choice" | "text" | "textarea" | "rarityMap" | "raritySet"
+ *             enabledWhen = { autreClé: valeur | [valeurs] } : champ masqué sinon
  *             group = "advanced" pour les ranger dans « Réglages avancés »
  *   preview(ctx, params)  -> { summary, warnings, columns, rows, canRun, state }
  *             rows : [{ id, cells: { [columnKey]: valeur }, selectable, note }]

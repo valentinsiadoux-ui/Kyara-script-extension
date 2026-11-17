@@ -8,6 +8,7 @@
     return;
 
   const MAX_LOGS = 500;
+  const CATEGORIES = ["Marché", "Échanges", "Comptoir"];
   const STEP_LABELS = {
     params: "1 · Réglages",
     loading: "2 · Aperçu",
@@ -105,28 +106,40 @@
       "aria-label": "Scripts Kyara",
       hidden: true,
     },
-    K.scripts.map((s) =>
-      h(
-        "button",
-        {
-          type: "button",
-          role: "menuitem",
-          "data-id": s.id,
-          "aria-haspopup": "dialog",
-          onClick: () => {
-            toggleMenu(false);
-            open(s.id);
-          },
-        },
-        h("span", { class: "ic", "aria-hidden": "true" }, s.icon),
+    // Une rubrique par catégorie, dans l'ordre de CATEGORIES ; le reste à la fin.
+    [...new Set([...CATEGORIES, ...K.scripts.map((s) => s.category ?? "Autres")])]
+      .map((cat) => [cat, K.scripts.filter((s) => (s.category ?? "Autres") === cat)])
+      .filter(([, scripts]) => scripts.length)
+      .map(([cat, scripts]) =>
         h(
-          "span",
-          { class: "txt" },
-          h("b", {}, s.name),
-          h("small", {}, s.description),
+          "div",
+          { class: "sec", role: "group", "aria-label": cat },
+          h("div", { class: "sec-hd", "aria-hidden": "true" }, cat),
+          scripts.map((s) =>
+            h(
+              "button",
+              {
+                type: "button",
+                role: "menuitem",
+                "data-id": s.id,
+                "aria-haspopup": "dialog",
+                title: s.description,
+                onClick: () => {
+                  toggleMenu(false);
+                  open(s.id);
+                },
+              },
+              h("span", { class: "ic", "aria-hidden": "true" }, s.icon),
+              h(
+                "span",
+                { class: "txt" },
+                h("b", {}, s.name),
+                h("small", {}, s.short ?? s.description),
+              ),
+            ),
+          ),
         ),
       ),
-    ),
   );
   barRoot.append(
     h("style", {}, K.styles),
@@ -380,6 +393,25 @@
         input,
         buttons,
       );
+    } else if (p.type === "choice") {
+      // Rangée de boutons radio : une seule option active.
+      control = h(
+        "div",
+        { class: "choice-group", role: "radiogroup", "aria-label": p.label },
+        p.options.map(([v, label]) =>
+          h(
+            "label",
+            { class: "choice-option" },
+            h("input", {
+              type: "radio",
+              name: p.key,
+              value: v,
+              checked: v === value,
+            }),
+            h("span", {}, label),
+          ),
+        ),
+      );
     } else if (p.type === "raritySet") {
       const colors = {
         C: "#B5B1BB",
@@ -561,16 +593,22 @@
         step: p.step ?? 1,
         value: value ?? "",
       });
+    } else if (p.type === "textarea") {
+      control = h(
+        "textarea",
+        { name: p.key, rows: 3, required: !p.optional },
+        value ?? "",
+      );
     } else {
       control = h("input", {
         type: "text",
         name: p.key,
-        required: true,
+        required: !p.optional,
         value: value ?? "",
       });
     }
     return h(
-      ["raritySet", "modeToggle"].includes(p.type) ? "div" : "label",
+      ["raritySet", "modeToggle", "choice"].includes(p.type) ? "div" : "label",
       { class: "field" },
       h("span", {}, p.label),
       control,
@@ -672,8 +710,10 @@
         const node = form.querySelector('[data-param="' + p.key + '"]');
         const enabled =
           !p.enabledWhen ||
-          Object.entries(p.enabledWhen).every(
-            ([key, value]) => values[key] === value,
+          Object.entries(p.enabledWhen).every(([key, value]) =>
+            Array.isArray(value)
+              ? value.includes(values[key])
+              : values[key] === value,
           );
         const showDisabled =
           script.id === "preparer-echange" &&
@@ -682,7 +722,7 @@
             (p.key === "maxGapPercent" && values.balanceMode === "value"));
         node.hidden = !enabled && !showDisabled;
         node.classList.toggle("inactive", !enabled && showDisabled);
-        node.querySelectorAll("input, select, button").forEach((el) => {
+        node.querySelectorAll("input, select, textarea, button").forEach((el) => {
           el.disabled = !enabled;
         });
       }

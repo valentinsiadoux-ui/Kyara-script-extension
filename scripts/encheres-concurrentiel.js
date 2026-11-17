@@ -291,6 +291,8 @@
     id: "encheres-concurrentiel",
     name: "Enchères (étude de marché)",
     icon: "🔨",
+    category: "Marché",
+    short: "Guidées par une étude de marché",
     description: "Étudie la demande, les ventes et la concurrence de mes doublons, puis les met aux enchères au meilleur prix tout en restant attractif.",
     params: [
       { key: "strategy", label: "Stratégie", type: "select", default: "equilibre",
