@@ -102,26 +102,26 @@ et corrige l'endpoint dans « Réglages avancés » ou `buildBody` dans le fichi
 
 ## Préparer un échange direct
 
-Ouvrir une fenêtre « Proposer un échange » vide sur le profil du joueur, puis choisir
-**K Scripts → Préparer un échange**. Fonctionne aussi en demi-fenêtre : les étapes
-« Tu donnes » et « Tu reçois » sont activées successivement.
+Ouvrir un échange vide puis **K Scripts → Préparer un échange**. Choisir les réglages
+et cliquer sur **Préparer l'échange** : démarrage direct, sans aperçu.
 
-- Maximum 20 cartes par côté (limite fixe), dans l'ordre du site.
-- Active « Mes doubles » + « Il lui manque », puis « Ses doubles » + « Il me manque ».
-- Charge toutes les pages des inventaires ; efface la recherche et remet la rareté sur Toutes.
-- Exclut des cartes à recevoir celles déjà demandées dans les échanges envoyés en attente.
-- Si un côté n'a aucune carte, remplit son chakra avec la moitié de la valeur opposée,
-  arrondie à l'entier inférieur (option désactivable). Si les deux côtés sont vides, ne met aucun chakra.
-- L'aperçu expose les règles ; les inventaires complets sont chargés au lancement.
-- Le journal indique chaque ajout et l'arrêt conserve les ajouts déjà effectués.
-- **L'envoi de la proposition reste manuel.**
+- Jusqu'à 20 cartes par côté, uniquement des doubles manquants.
+- Une sélection de raretés commune aux cartes données et reçues.
+- Les cartes déjà demandées dans les échanges envoyés en attente sont exclues des cartes reçues.
+- **Achat** : aucune carte donnée ; chakra égal au pourcentage choisi de la valeur des
+  cartes reçues (50 % par défaut), arrondi à l'entier inférieur.
+- **Équilibrer** (échange uniquement) : par rareté, même nombre de cartes de chaque rareté
+  des deux côtés ; par valeur, le plus grand total respecte l’écart maximum choisi (10 % par défaut),
+  même si les raretés diffèrent. La recherche privilégie le nombre de cartes et peut
+  retenir moins de 20 cartes. Si elle ne trouve aucun panier compatible, aucune carte n'est ajoutée.
+- Sans équilibrage, les 20 premières cartes éligibles de chaque côté sont retenues.
+- Aucune compensation automatique en chakra en mode échange.
+- Fonctionne en demi-fenêtre avec passage entre les étapes. Charge tous les inventaires,
+  efface la recherche et remet la rareté du site sur Toutes avant le filtrage du script.
+- L'arrêt conserve les cartes déjà ajoutées. **L'envoi reste manuel.**
 
-Après installation de cette mise à jour, recharger l'extension puis la page Kyara.
-### Raretés et mode Achat
+Recharger l'extension puis la page Kyara après une mise à jour.
 
-Cocher séparément les raretés à donner et à récupérer (toutes par défaut).
-En mode **Achat**, aucune carte n’est donnée : jusqu’à 20 de ses doubles manquants
-sont sélectionnés parmi les raretés à récupérer, en excluant les demandes déjà en attente.
-Le chakra donné vaut le pourcentage choisi de leur valeur totale, arrondi à l’entier inférieur
-(50 % par défaut, de 0,01 à 100 %). La compensation habituelle est ignorée dans ce mode.
-Les raretés à donner sont ignorées en mode Achat. L’envoi reste manuel.
+Les réglages proposent un sélecteur **Échange / Achat**. Le prix est actif en Achat uniquement ; l’équilibrage est actif en Échange, et son mode uniquement si la case Équilibrer est cochée. Les raretés sont des boutons colorés multisélection, avec un bouton Toutes.
+
+Le bouton Toutes sélectionne tout ou désélectionne tout. Glisser sur les raretés applique à la plage traversée l’état inverse du bouton de départ. Le mode d’équilibrage reste visible mais grisé en Échange lorsque Équilibrer est décoché. Écart maximum (%) apparaît uniquement pour l’équilibrage par valeur actif (0 à 100 %). Seul le toggle Achat / Échange est animé.
