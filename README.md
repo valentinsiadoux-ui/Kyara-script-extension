@@ -99,3 +99,21 @@ ui/content.js        menu flottant + popover
 ⚠ Comme dans les scripts d'origine, les endpoints de **création** (offre d'échange, annonce d'enchère) et
 leur corps de requête sont déduits, pas vérifiés : contrôle la première publication dans F12 > Réseau,
 et corrige l'endpoint dans « Réglages avancés » ou `buildBody` dans le fichier du script.
+
+## Préparer un échange direct
+
+Ouvrir une fenêtre « Proposer un échange » vide sur le profil du joueur, puis choisir
+**K Scripts → Préparer un échange**. Fonctionne aussi en demi-fenêtre : les étapes
+« Tu donnes » et « Tu reçois » sont activées successivement.
+
+- Maximum 20 cartes par côté (réglable), dans l'ordre du site.
+- Active « Mes doubles » + « Il lui manque », puis « Ses doubles » + « Il me manque ».
+- Charge toutes les pages des inventaires ; efface la recherche et remet la rareté sur Toutes.
+- Exclut des cartes à recevoir celles déjà demandées dans les échanges envoyés en attente.
+- Si un côté n'a aucune carte, remplit son chakra avec la moitié de la valeur opposée,
+  arrondie à l'entier inférieur (option désactivable). Si les deux côtés sont vides, ne met aucun chakra.
+- L'aperçu expose les règles ; les inventaires complets sont chargés au lancement.
+- Le journal indique chaque ajout et l'arrêt conserve les ajouts déjà effectués.
+- **L'envoi de la proposition reste manuel.**
+
+Après installation de cette mise à jour, recharger l'extension puis la page Kyara.
