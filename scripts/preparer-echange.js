@@ -7,11 +7,11 @@
       .querySelector("img")
       ?.getAttribute("src")
       ?.match(/\/(\d+)\.[a-z0-9]+(?:[?#]|$)/i)?.[1];
-  const amount = (text) => {
+  const parseAmount = (text) => {
     const match = String(text)
       .replace(/\s/g, "")
       .match(/\d+(?:[.,]\d+)?/);
-    if (!match) throw new Error("Montant illisible dans le formulaire.");
+    if (!match) return null;
     return Number(match[0].replace(",", "."));
   };
   function currentForm() {
@@ -360,32 +360,28 @@
           );
         }
         guard(ctx, form);
-        const cards = [
-          ...inventory.querySelectorAll('button.tile[aria-label^="Ajouter "]'),
-        ]
-          .filter((b) => !b.disabled)
-          .map((b) => ({
-            id: idOf(b),
-            name: b.getAttribute("title") || b.getAttribute("aria-label"),
-            rarity: b.querySelector(".seal")?.textContent.trim(),
-            value: amount(b.querySelector(".pr")?.textContent),
-          }));
-        if (cards.some((c) => !c.id))
-          throw new Error(
-            "Identifiant de carte introuvable dans un inventaire.",
-          );
-        if (cards.some((c) => !K.RARITIES.includes(c.rarity)))
-          throw new Error("Rareté de carte illisible. Préparation arrêtée.");
         const allowed = new Set(p.rarities);
-        pools[side] = [
-          ...new Map(
-            cards
-              .filter(
-                (c) => allowed.has(c.rarity) && (side === 0 || !ids.has(c.id)),
-              )
-              .map((c) => [c.id, c]),
-          ).values(),
-        ];
+        let missingPrice = "";
+        ctx.status(labels[side] + (p.buy ? " : lecture des doubles…" : " : attente du chargement des prix…"));
+        await wait(ctx, form, () => {
+          // Relire les éléments : Svelte peut remplacer les cartes pendant le chargement.
+          const cards = [...inventory.querySelectorAll('button.tile[aria-label^="Ajouter "]')]
+            .filter(b => !b.disabled)
+            .map(b => ({
+              id: idOf(b),
+              name: b.getAttribute("title") || b.getAttribute("aria-label"),
+              rarity: b.querySelector(".seal")?.textContent.trim(),
+              value: parseAmount(b.querySelector(".pr")?.textContent),
+            }));
+          if (cards.some(c => !c.id)) throw new Error("Identifiant de carte introuvable dans un inventaire.");
+          if (cards.some(c => !K.RARITIES.includes(c.rarity))) throw new Error("Rareté de carte illisible. Préparation arrêtée.");
+          const eligible = cards.filter(c => allowed.has(c.rarity) && (side === 0 || !ids.has(c.id)));
+          missingPrice = eligible.find(c => c.value === null)?.name || "";
+          if (!p.buy && missingPrice) return false;
+          pools[side] = [...new Map(eligible.map(c => [c.id, c])).values()];
+          return true;
+        }, "Certains prix de cartes n’ont pas été chargés après 15 secondes. Réessaie lorsque les prix sont affichés.");
+
       }
       guard(ctx, form);
       assertEmpty(form);
@@ -459,14 +455,27 @@
         const empty = counts[0] === 0 ? 0 : 1;
         const opposite = 1 - empty;
         const trays = parts(form).trays;
-        const total =
-          trays[opposite].querySelector(".total") ||
-          form.querySelectorAll(".strip .amt b")[opposite];
+        let totalValue = null;
+        let previous = null;
+        let stableReads = 0;
+        const expectedPositive = sum(plan[opposite]) > 0 || plan[opposite].some(card => card.value === null);
+        ctx.status("Attente de la mise à jour du total…");
+        await wait(ctx, form, () => {
+          const currentTrays = parts(form).trays;
+          const total = currentTrays[opposite].querySelector(".total") || form.querySelectorAll(".strip .amt b")[opposite];
+          const next = parseAmount(total?.textContent);
+          if (next === null || (expectedPositive && next === 0)) {
+            stableReads = 0; previous = null; return false;
+          }
+          stableReads = next === previous ? stableReads + 1 : 1;
+          previous = next; totalValue = next;
+          return stableReads >= 3;
+        }, "Le total des cartes reçues n’a pas été chargé après 15 secondes. Aucun chakra n’a été saisi.");
         const input = trays[empty].querySelector('.ch input[type="number"]');
-        if (!total || !input)
+        if (!input)
           throw new Error("Total ou champ chakra introuvable.");
         const value = Math.floor(
-          (amount(total.textContent) * p.buyPercent) / 100,
+          (totalValue * p.buyPercent) / 100,
         );
         if (input.disabled || input.readOnly)
           throw new Error("Le champ chakra est indisponible.");
