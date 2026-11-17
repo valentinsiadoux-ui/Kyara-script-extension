@@ -360,39 +360,44 @@
         ),
       );
     } else if (p.type === "modeToggle") {
+      // Sélecteur segmenté : une seule option active, indicateur animé.
+      const options = p.options;
       const input = h("input", {
-        type: "checkbox",
+        type: "hidden",
         name: p.key,
-        checked: !!value,
-        hidden: true,
+        value: options.some(([v]) => v === value) ? value : p.default,
       });
-      const buttons = [
-        [false, "Échange"],
-        [true, "Achat"],
-      ].map(([buy, label]) =>
+      const group = h("div", {
+        class: "mode-toggle",
+        role: "group",
+        "aria-label": p.label,
+      });
+      const place = () => {
+        const i = options.findIndex(([v]) => v === input.value);
+        group.style.setProperty("--n", options.length);
+        group.style.setProperty("--i", Math.max(0, i));
+        buttons.forEach((b, j) =>
+          b.setAttribute("aria-pressed", String(j === i)),
+        );
+      };
+      const buttons = options.map(([v, label]) =>
         h(
           "button",
           {
             type: "button",
             class: "mode-option",
-            "aria-pressed": String(!!value === buy),
             onClick: () => {
-              input.checked = buy;
-              buttons.forEach((b, i) =>
-                b.setAttribute("aria-pressed", String(Boolean(i) === buy)),
-              );
+              input.value = v;
+              place();
               input.dispatchEvent(new Event("change", { bubbles: true }));
             },
           },
           label,
         ),
       );
-      control = h(
-        "div",
-        { class: "mode-toggle", role: "group", "aria-label": p.label },
-        input,
-        buttons,
-      );
+      group.append(input, ...buttons);
+      place();
+      control = group;
     } else if (p.type === "choice") {
       // Rangée de boutons radio : une seule option active.
       control = h(
@@ -619,7 +624,7 @@
   function readForm(script, form) {
     const values = {};
     for (const p of script.params) {
-      if (p.type === "boolean" || p.type === "modeToggle")
+      if (p.type === "boolean")
         values[p.key] = form.elements[p.key].checked;
       else if (p.type === "number")
         values[p.key] = Number(form.elements[p.key].value);
@@ -717,7 +722,7 @@
           );
         const showDisabled =
           script.id === "preparer-echange" &&
-          values.buy === false &&
+          values.mode === "trade" &&
           (p.key === "balanceMode" ||
             (p.key === "maxGapPercent" && values.balanceMode === "value"));
         node.hidden = !enabled && !showDisabled;

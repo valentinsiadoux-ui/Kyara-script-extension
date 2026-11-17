@@ -145,6 +145,8 @@ et cliquer sur **Préparer l'échange** : démarrage direct, sans aperçu.
 - Les cartes déjà demandées dans les échanges envoyés en attente sont exclues des cartes reçues.
 - **Achat** : aucune carte donnée ; chakra égal au pourcentage choisi de la valeur des
   cartes reçues (50 % par défaut), arrondi à l'entier inférieur.
+- **Vente** : aucune carte reçue ; mes doublons qui lui manquent sont donnés contre un
+  chakra égal au pourcentage choisi de leur valeur (50 % par défaut), arrondi à l'entier inférieur.
 - **Équilibrer** (échange uniquement) : par rareté, même nombre de cartes de chaque rareté
   des deux côtés ; par valeur, le plus grand total respecte l’écart maximum choisi (10 % par défaut),
   même si les raretés diffèrent. La recherche privilégie le nombre de cartes et peut
@@ -157,6 +159,6 @@ et cliquer sur **Préparer l'échange** : démarrage direct, sans aperçu.
 
 Recharger l'extension puis la page Kyara après une mise à jour.
 
-Les réglages proposent un sélecteur **Échange / Achat**. Le prix est actif en Achat uniquement ; l’équilibrage est actif en Échange, et son mode uniquement si la case Équilibrer est cochée. Les raretés sont des boutons colorés multisélection, avec un bouton Toutes.
+Les réglages proposent un sélecteur **Échange / Achat / Vente**. Le prix est actif en Achat et en Vente ; l’équilibrage est actif en Échange, et son mode uniquement si la case Équilibrer est cochée. Les raretés sont des boutons colorés multisélection, avec un bouton Toutes.
 
-Le bouton Toutes sélectionne tout ou désélectionne tout. Glisser sur les raretés applique à la plage traversée l’état inverse du bouton de départ. Le mode d’équilibrage reste visible mais grisé en Échange lorsque Équilibrer est décoché. Écart maximum (%) apparaît uniquement pour l’équilibrage par valeur actif (0 à 100 %). Seul le toggle Achat / Échange est animé.
+Le bouton Toutes sélectionne tout ou désélectionne tout. Glisser sur les raretés applique à la plage traversée l’état inverse du bouton de départ. Le mode d’équilibrage reste visible mais grisé en Échange lorsque Équilibrer est décoché. Écart maximum (%) apparaît uniquement pour l’équilibrage par valeur actif (0 à 100 %). Seul le sélecteur de mode est animé.

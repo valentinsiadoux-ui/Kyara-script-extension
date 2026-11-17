@@ -110,17 +110,19 @@
       p.rarities.some((r) => !K.RARITIES.includes(r))
     )
       throw new Error("Coche au moins une rareté.");
+    if (!["trade", "buy", "sell"].includes(p.mode))
+      throw new Error("Choisis un mode : Échange, Achat ou Vente.");
     if (
-      p.buy &&
+      p.mode !== "trade" &&
       (!Number.isFinite(p.buyPercent) ||
         p.buyPercent <= 0 ||
         p.buyPercent > 100)
     )
       throw new Error(
-        "Le pourcentage d'achat doit être supérieur à 0 et inférieur ou égal à 100.",
+        "Le pourcentage de prix doit être supérieur à 0 et inférieur ou égal à 100.",
       );
     if (
-      !p.buy &&
+      p.mode === "trade" &&
       p.balance &&
       p.balanceMode === "value" &&
       (!Number.isFinite(p.maxGapPercent) ||
@@ -128,7 +130,7 @@
         p.maxGapPercent > 100)
     )
       throw new Error("L’écart maximum doit être compris entre 0 et 100 %.");
-    if (!p.buy && p.balance && !["rarity", "value"].includes(p.balanceMode))
+    if (p.mode === "trade" && p.balance && !["rarity", "value"].includes(p.balanceMode))
       throw new Error("Choisis un mode d'équilibrage.");
   }
   const sum = (cards) => cards.reduce((n, c) => n + c.value, 0);
@@ -252,7 +254,7 @@
     category: "Échanges",
     short: "Remplit l'échange direct ouvert",
     description:
-      "Prépare des doubles manquants avec raretés communes, équilibrage ou achat en chakra. Envoi manuel.",
+      "Prépare des doubles manquants avec raretés communes, équilibrage, achat ou vente en chakra. Envoi manuel.",
     skipPreview: true,
     params: [
       {
@@ -261,28 +263,38 @@
         type: "raritySet",
         default: [...K.RARITIES],
       },
-      { key: "buy", label: "Mode", type: "modeToggle", default: false },
+      {
+        key: "mode",
+        label: "Mode",
+        type: "modeToggle",
+        default: "trade",
+        options: [
+          ["trade", "Échange"],
+          ["buy", "Achat"],
+          ["sell", "Vente"],
+        ],
+      },
       {
         key: "buyPercent",
-        enabledWhen: { buy: true },
-        label: "Prix d'achat (% de la valeur totale)",
+        enabledWhen: { mode: ["buy", "sell"] },
+        label: "Prix (% de la valeur totale)",
         type: "number",
         default: 50,
         min: 1,
         max: 100,
         step: 1,
-        help: "Mode Achat uniquement. Arrondi à l'entier inférieur.",
+        help: "Achat : chakra donné pour ses doublons. Vente : chakra demandé pour mes doublons. Arrondi à l'entier inférieur.",
       },
       {
         key: "balance",
-        enabledWhen: { buy: false },
+        enabledWhen: { mode: "trade" },
         label: "Équilibrer les cartes",
         type: "boolean",
         default: false,
       },
       {
         key: "balanceMode",
-        enabledWhen: { buy: false, balance: true },
+        enabledWhen: { mode: "trade", balance: true },
         label: "Mode d'équilibrage",
         type: "select",
         default: "rarity",
@@ -300,7 +312,7 @@
         min: 0,
         max: 100,
         step: 0.1,
-        enabledWhen: { buy: false, balance: true, balanceMode: "value" },
+        enabledWhen: { mode: "trade", balance: true, balanceMode: "value" },
         title:
           "Écart calculé par rapport au plus petit total. 0 % impose des totaux identiques.",
       },
@@ -310,11 +322,14 @@
       guard(ctx, form);
       assertEmpty(form);
       validate(p);
+      // Échange : deux côtés ; Achat : ses doublons seuls ; Vente : mes doublons seuls.
+      const trade = p.mode === "trade";
+      const sides = { trade: [0, 1], buy: [1], sell: [0] }[p.mode];
       const ids = await reserved(ctx);
       guard(ctx, form);
       const counts = [0, 0];
       const pools = [[], []];
-      for (const side of p.buy ? [1] : [0, 1]) {
+      for (const side of sides) {
         ctx.status(`${labels[side]} : chargement des doubles manquants…`);
         const tab = form.querySelectorAll('.steps button[role="tab"]')[side];
         if (!tab || tab.disabled)
@@ -364,7 +379,7 @@
         guard(ctx, form);
         const allowed = new Set(p.rarities);
         let missingPrice = "";
-        ctx.status(labels[side] + (p.buy ? " : lecture des doubles…" : " : attente du chargement des prix…"));
+        ctx.status(labels[side] + (!trade ? " : lecture des doubles…" : " : attente du chargement des prix…"));
         await wait(ctx, form, () => {
           // Relire les éléments : Svelte peut remplacer les cartes pendant le chargement.
           const cards = [...inventory.querySelectorAll('button.tile[aria-label^="Ajouter "]')]
@@ -379,7 +394,7 @@
           if (cards.some(c => !K.RARITIES.includes(c.rarity))) throw new Error("Rareté de carte illisible. Préparation arrêtée.");
           const eligible = cards.filter(c => allowed.has(c.rarity) && (side === 0 || !ids.has(c.id)));
           missingPrice = eligible.find(c => c.value === null)?.name || "";
-          if (!p.buy && missingPrice) return false;
+          if (trade && missingPrice) return false;
           pools[side] = [...new Map(eligible.map(c => [c.id, c])).values()];
           return true;
         }, "Certains prix de cartes n’ont pas été chargés après 15 secondes. Réessaie lorsque les prix sont affichés.");
@@ -389,7 +404,7 @@
       assertEmpty(form);
       ctx.status("Choix des cartes…");
       let plan = pools.map((cards) => cards.slice(0, 20));
-      if (!p.buy && p.balance) {
+      if (trade && p.balance) {
         plan =
           p.balanceMode === "rarity"
             ? rarityPlan(pools)
@@ -412,7 +427,7 @@
           "info",
         );
       }
-      for (const side of p.buy ? [1] : [0, 1]) {
+      for (const side of sides) {
         guard(ctx, form);
         const tab = form.querySelectorAll('.steps button[role="tab"]')[side];
         if (!tab || tab.disabled)
@@ -453,8 +468,9 @@
         }
       }
       guard(ctx, form);
-      if (p.buy && counts[1] > 0) {
-        const empty = counts[0] === 0 ? 0 : 1;
+      if (!trade && counts[p.mode === "buy" ? 1 : 0] > 0) {
+        // Le chakra va du côté resté vide.
+        const empty = p.mode === "buy" ? 0 : 1;
         const opposite = 1 - empty;
         const trays = parts(form).trays;
         let totalValue = null;
@@ -472,7 +488,7 @@
           stableReads = next === previous ? stableReads + 1 : 1;
           previous = next; totalValue = next;
           return stableReads >= 3;
-        }, "Le total des cartes reçues n’a pas été chargé après 15 secondes. Aucun chakra n’a été saisi.");
+        }, `Le total des cartes ${p.mode === "buy" ? "reçues" : "données"} n’a pas été chargé après 15 secondes. Aucun chakra n’a été saisi.`);
         const input = trays[empty].querySelector('.ch input[type="number"]');
         if (!input)
           throw new Error("Total ou champ chakra introuvable.");
@@ -489,7 +505,7 @@
             "Le montant de chakra n'a pas été accepté par le champ.",
           );
         ctx.log(
-          `${labels[empty]} : ${value} ◆ (${p.buyPercent} % de la valeur reçue).`,
+          `${labels[empty]} : ${value} ◆ (${p.buyPercent} % de la valeur ${p.mode === "buy" ? "reçue" : "donnée"}).`,
           "success",
         );
       }

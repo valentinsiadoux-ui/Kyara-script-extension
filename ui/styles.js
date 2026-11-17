@@ -175,8 +175,7 @@ summary { cursor: pointer; color: var(--mut); font-size: 12px; margin-bottom: 10
 .mode-toggle { position: relative; isolation: isolate; display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); }
 .mode-toggle input, .rar-sheet input { display: none; }
 .mode-option { position: relative; z-index: 1; flex: 1; border: 1px solid transparent; border-radius: 8px; padding: 9px 12px; background: transparent; color: var(--mut); font: inherit; cursor: pointer; }
-.mode-toggle::before { content: ""; position: absolute; z-index: 0; pointer-events: none; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 6px); box-sizing: border-box; border-radius: 8px; border: 1px solid var(--acc); background: color-mix(in srgb, var(--acc) 18%, var(--bg)); transform: translateX(0); transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
-.mode-toggle:has(.mode-option:last-child[aria-pressed="true"])::before { transform: translateX(calc(100% + 4px)); }
+.mode-toggle::before { content: ""; position: absolute; z-index: 0; pointer-events: none; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px - (var(--n, 2) - 1) * 4px) / var(--n, 2)); box-sizing: border-box; border-radius: 8px; border: 1px solid var(--acc); background: color-mix(in srgb, var(--acc) 18%, var(--bg)); transform: translateX(calc(var(--i, 0) * (100% + 4px))); transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
 .mode-option[aria-pressed="true"] { color: var(--fg); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .mode-toggle::before { transition: none; } }
 .field:has(.rar-sheet), .field:has(.mode-toggle), .field:has(.choice-group), .field:has(textarea) { grid-column: 1 / -1; }
