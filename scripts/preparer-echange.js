@@ -65,30 +65,45 @@
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   };
+  function validate(p) {
+    for (const key of p.buy ? ["receiveRarities"] : ["giveRarities", "receiveRarities"]) {
+      if (!Array.isArray(p[key]) || !p[key].length || p[key].some(r => !K.RARITIES.includes(r)))
+        throw new Error("Coche au moins une rareté pour chaque côté utilisé.");
+    }
+    if (p.buy && (!Number.isFinite(p.buyPercent) || p.buyPercent <= 0 || p.buyPercent > 100))
+      throw new Error("Le pourcentage d'achat doit être supérieur à 0 et inférieur ou égal à 100.");
+  }
   K.register({
     id: "preparer-echange",
     name: "Préparer un échange",
     icon: "⇄",
     description: "Remplit l'échange ouvert avec des doubles manquants, puis le chakra si un côté est vide. Envoi manuel.",
     params: [
-      { key: "maxCards", label: "Cartes maximum par côté", type: "number", default: 20, min: 1, max: 20 },
+      { key: "giveRarities", label: "Raretés à donner (ignorées en mode Achat)", type: "raritySet", default: [...K.RARITIES] },
+      { key: "receiveRarities", label: "Raretés à récupérer", type: "raritySet", default: [...K.RARITIES] },
+      { key: "buy", label: "Achat : recevoir ses doubles contre du chakra, sans donner de cartes", type: "boolean", default: false },
+      { key: "buyPercent", label: "Prix d'achat (% de la valeur totale)", type: "number", default: 50, min: 0.01, max: 100, step: 0.01, help: "Utilisé uniquement en mode Achat. Montant arrondi à l'entier inférieur." },
       { key: "compensate", label: "Si un côté est vide, compléter avec la moitié de la valeur opposée en chakra", type: "boolean", default: true },
     ],
     async preview(ctx, p) {
+      validate(p);
       const form = currentForm();
       assertEmpty(form);
       ctx.status("Lecture des cartes déjà demandées…");
       const ids = await reserved(ctx);
       guard(ctx, form);
       return {
-        summary: `Préparer jusqu'à ${p.maxCards} cartes par côté pour ${form.closest('[role="dialog"]').getAttribute("aria-label")}.`,
+        summary: `${p.buy ? `Achat à ${p.buyPercent} % : jusqu’à 20 cartes à recevoir, sans carte donnée` : 'Échange : jusqu’à 20 cartes par côté'} — ${form.closest('[role="dialog"]').getAttribute("aria-label")}.`,
         warnings: [
           `${ids.size} carte(s) déjà demandée(s) dans des échanges envoyés en attente seront exclues du côté reçu.`,
           "Les cartes seront choisies dans l'ordre du site après activation des filtres doubles et manquantes. La liste complète sera chargée au lancement.",
           "La préparation modifie le formulaire ouvert. L'arrêt conserve les cartes déjà ajoutées. Vérifie le résultat puis envoie toi-même la proposition.",
         ],
         columns: [{ key: "side", label: "Côté" }, { key: "rule", label: "Sélection" }],
-        rows: labels.map((side, i) => ({ id: i, selectable: false, cells: { side, rule: i ? "Ses doubles · Il me manque · Pas déjà demandées" : "Mes doubles · Il lui manque" } })),
+        rows: labels.map((side, i) => ({ id: i, selectable: false, cells: { side, rule: i
+          ? "Ses doubles · Il me manque · Pas déjà demandées · " + p.receiveRarities.map(r => K.LABELS[r]).join(", ")
+          : p.buy ? "Chakra : " + p.buyPercent + " % de la valeur reçue"
+          : "Mes doubles · Il lui manque · " + p.giveRarities.map(r => K.LABELS[r]).join(", ") } })),
         canRun: true,
         state: { form },
       };
@@ -97,11 +112,11 @@
       const form = state.form;
       guard(ctx, form);
       assertEmpty(form);
-      if (!Number.isInteger(p.maxCards) || p.maxCards < 1 || p.maxCards > 20) throw new Error("Choisis entre 1 et 20 cartes.");
+      validate(p);
       const ids = await reserved(ctx);
       guard(ctx, form);
       const counts = [0, 0];
-      for (const side of [0, 1]) {
+      for (const side of p.buy ? [1] : [0, 1]) {
         ctx.status(`${labels[side]} : chargement des doubles manquants…`);
         const tab = form.querySelectorAll('.steps button[role="tab"]')[side];
         if (!tab || tab.disabled) throw new Error(`Étape « ${labels[side]} » indisponible.`);
@@ -129,9 +144,11 @@
         guard(ctx, form);
         const cards = [...inventory.querySelectorAll('button.tile[aria-label^="Ajouter "]')]
           .filter(b => !b.disabled)
-          .map(b => ({ id: idOf(b), name: b.getAttribute("title") || b.getAttribute("aria-label") }));
+          .map(b => ({ id: idOf(b), name: b.getAttribute("title") || b.getAttribute("aria-label"), rarity: b.querySelector(".seal")?.textContent.trim() }));
         if (cards.some(c => !c.id)) throw new Error("Identifiant de carte introuvable dans un inventaire.");
-        const chosen = [...new Map(cards.filter(c => side === 0 || !ids.has(c.id)).map(c => [c.id, c])).values()].slice(0, p.maxCards);
+        if (cards.some(c => !K.RARITIES.includes(c.rarity))) throw new Error("Rareté de carte illisible. Préparation arrêtée.");
+        const allowed = new Set(side === 0 ? p.giveRarities : p.receiveRarities);
+        const chosen = [...new Map(cards.filter(c => allowed.has(c.rarity) && (side === 0 || !ids.has(c.id))).map(c => [c.id, c])).values()].slice(0, 20);
         for (const card of chosen) {
           guard(ctx, form);
           const button = [...inventory.querySelectorAll('button.tile[aria-label^="Ajouter "]')].find(b => idOf(b) === card.id);
@@ -143,20 +160,20 @@
         }
       }
       guard(ctx, form);
-      if (p.compensate && counts.some(n => n === 0) && counts.some(n => n > 0)) {
+      if ((p.buy && counts[1] > 0) || (!p.buy && p.compensate && counts.some(n => n === 0) && counts.some(n => n > 0))) {
         const empty = counts[0] === 0 ? 0 : 1;
         const opposite = 1 - empty;
         const trays = parts(form).trays;
         const total = trays[opposite].querySelector(".total") || form.querySelectorAll(".strip .amt b")[opposite];
         const input = trays[empty].querySelector('.ch input[type="number"]');
         if (!total || !input) throw new Error("Total ou champ chakra introuvable.");
-        const value = Math.floor(amount(total.textContent) / 2);
+        const value = Math.floor(amount(total.textContent) * (p.buy ? p.buyPercent / 100 : 0.5));
         if (input.disabled || input.readOnly) throw new Error("Le champ chakra est indisponible.");
         setValue(input, value);
         await ctx.sleep(250);
         guard(ctx, form);
         if (Number(input.value) !== value || !input.checkValidity()) throw new Error("Le montant de chakra n'a pas été accepté par le champ.");
-        ctx.log(`${labels[empty]} : ${value} ◆ (moitié du total opposé).`, "success");
+        ctx.log(`${labels[empty]} : ${value} ◆ (${p.buy ? p.buyPercent + " % de la valeur reçue" : "moitié du total opposé"}).`, "success");
       }
       ctx.status(`${counts[0]} carte(s) donnée(s), ${counts[1]} reçue(s). Envoi manuel.`);
       ctx.log(counts.every(n => n === 0) ? "Aucun double manquant disponible des deux côtés." : "Préparation terminée. Vérifie le formulaire puis envoie la proposition sur le site.", "info");

@@ -106,7 +106,7 @@ Ouvrir une fenêtre « Proposer un échange » vide sur le profil du joueur, pui
 **K Scripts → Préparer un échange**. Fonctionne aussi en demi-fenêtre : les étapes
 « Tu donnes » et « Tu reçois » sont activées successivement.
 
-- Maximum 20 cartes par côté (réglable), dans l'ordre du site.
+- Maximum 20 cartes par côté (limite fixe), dans l'ordre du site.
 - Active « Mes doubles » + « Il lui manque », puis « Ses doubles » + « Il me manque ».
 - Charge toutes les pages des inventaires ; efface la recherche et remet la rareté sur Toutes.
 - Exclut des cartes à recevoir celles déjà demandées dans les échanges envoyés en attente.
@@ -117,3 +117,11 @@ Ouvrir une fenêtre « Proposer un échange » vide sur le profil du joueur, pui
 - **L'envoi de la proposition reste manuel.**
 
 Après installation de cette mise à jour, recharger l'extension puis la page Kyara.
+### Raretés et mode Achat
+
+Cocher séparément les raretés à donner et à récupérer (toutes par défaut).
+En mode **Achat**, aucune carte n’est donnée : jusqu’à 20 de ses doubles manquants
+sont sélectionnés parmi les raretés à récupérer, en excluant les demandes déjà en attente.
+Le chakra donné vaut le pourcentage choisi de leur valeur totale, arrondi à l’entier inférieur
+(50 % par défaut, de 0,01 à 100 %). La compensation habituelle est ignorée dans ce mode.
+Les raretés à donner sont ignorées en mode Achat. L’envoi reste manuel.

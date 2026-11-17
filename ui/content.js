@@ -190,6 +190,9 @@
     let control;
     if (p.type === "select") {
       control = h("select", { name: p.key }, p.options.map(([v, label]) => h("option", { value: v, selected: v === value }, label)));
+    } else if (p.type === "raritySet") {
+      control = h("div", { class: "rmap" }, K.RARITIES.map(r => h("label", { title: K.LABELS[r] },
+        h("input", { type: "checkbox", name: p.key + "." + r, "aria-label": K.LABELS[r], checked: (value ?? []).includes(r) }), r)));
     } else if (p.type === "rarityMap") {
       control = h("div", { class: "rmap" }, K.RARITIES.map((r) => h("label", { title: K.LABELS[r] }, r,
         h("input", { type: "number", name: `${p.key}.${r}`, min: 0, step: "any", value: value?.[r] ?? "" }))));
@@ -198,7 +201,7 @@
     } else {
       control = h("input", { type: "text", name: p.key, required: true, value: value ?? "" });
     }
-    return h("label", { class: "field" }, h("span", {}, p.label), control, help);
+    return h(p.type === "raritySet" ? "div" : "label", { class: "field" }, h("span", {}, p.label), control, help);
   }
 
   function readForm(script, form) {
@@ -206,6 +209,9 @@
     for (const p of script.params) {
       if (p.type === "boolean") values[p.key] = form.elements[p.key].checked;
       else if (p.type === "number") values[p.key] = Number(form.elements[p.key].value);
+      else if (p.type === "raritySet") {
+        values[p.key] = K.RARITIES.filter(r => form.elements[p.key + "." + r].checked);
+      }
       else if (p.type === "rarityMap") {
         values[p.key] = {};
         for (const r of K.RARITIES) {

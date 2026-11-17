@@ -1,10 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Kyara Scripts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lance des scripts sur kyara.games depuis des boutons, avec réglages et aperçu avant exécution.",
-  "permissions": ["storage"],
-  "host_permissions": ["https://kyara.games/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://kyara.games/*"
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -21,7 +25,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://kyara.games/*"],
+      "matches": [
+        "https://kyara.games/*"
+      ],
       "run_at": "document_idle",
       "js": [
         "core/kit.js",
