@@ -32,8 +32,18 @@
     short: "Mes annonces, ordres et offres en cours",
     description: "Liste mes annonces, ordres d'achat et offres d'échange en cours ; ceux que je coche sont retirés.",
     params: [
-      { key: "kinds", label: "Afficher", type: "choice", default: "all",
-        options: [["all", "Tout"], ["market", "Ventes et enchères"], ["orders", "Ordres d'achat"], ["offers", "Offres d'échange"]] },
+      {
+        key: "kinds",
+        label: "Afficher",
+        type: "choice",
+        default: "all",
+        options: [
+          ["all", "Tout"],
+          ["market", "Ventes et enchères"],
+          ["orders", "Ordres d'achat"],
+          ["offers", "Offres d'échange"],
+        ],
+      },
       { key: "olderThan", label: "Seulement ce qui est en ligne depuis plus de (h, 0 = tout)", type: "number", default: 0, min: 0, max: 720 },
     ],
 
@@ -77,9 +87,7 @@
 
       const locked = items.filter((i) => i.locked).length;
       return {
-        summary: items.length
-          ? `${items.length} élément(s) en cours. Rien n'est retiré par défaut : coche ce que tu veux retirer.`
-          : "Rien en cours.",
+        summary: items.length ? `${items.length} élément(s) en cours. Rien n'est retiré par défaut : coche ce que tu veux retirer.` : "Rien en cours.",
         warnings: locked ? [`${locked} enchère(s) avec des mises : elles ne peuvent plus être retirées.`] : [],
         columns: [
           { key: "kind", label: "Type" },

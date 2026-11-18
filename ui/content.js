@@ -4,8 +4,7 @@
  */
 (() => {
   const K = globalThis.KyaraExt;
-  if (!K || window.top !== window || document.getElementById("kx-bar-host"))
-    return;
+  if (!K || window.top !== window || document.getElementById("kx-bar-host")) return;
 
   const MAX_LOGS = 500;
   const CATEGORIES = ["Marché", "Échanges", "Comptoir", "Collection", "Suivi"];
@@ -21,8 +20,7 @@
     const el = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
       if (value == null || value === false) continue;
-      if (key.startsWith("on"))
-        el.addEventListener(key.slice(2).toLowerCase(), value);
+      if (key.startsWith("on")) el.addEventListener(key.slice(2).toLowerCase(), value);
       else if (key === "class") el.className = value;
       else if (key in el && typeof value !== "string") el[key] = value;
       else el.setAttribute(key, value === true ? "" : value);
@@ -33,10 +31,7 @@
 
   // ---------- Réglages mémorisés ----------
   const storage = globalThis.chrome?.storage?.local;
-  const defaultsOf = (script) =>
-    Object.fromEntries(
-      script.params.map((p) => [p.key, structuredClone(p.default)]),
-    );
+  const defaultsOf = (script) => Object.fromEntries(script.params.map((p) => [p.key, structuredClone(p.default)]));
   async function loadValues(script) {
     try {
       const key = `params:${script.id}`;
@@ -198,12 +193,7 @@
                 },
               },
               h("span", { class: "ic", "aria-hidden": "true" }, s.icon),
-              h(
-                "span",
-                { class: "txt" },
-                h("b", {}, s.name),
-                h("small", {}, s.short ?? s.description),
-              ),
+              h("span", { class: "txt" }, h("b", {}, s.name), h("small", {}, s.short ?? s.description)),
             ),
           ),
         ),
@@ -229,10 +219,7 @@
       ),
     ),
   );
-  barRoot.append(
-    h("style", {}, K.styles),
-    h("div", { class: "bar" }, trigger, menu),
-  );
+  barRoot.append(h("style", {}, K.styles), h("div", { class: "bar" }, trigger, menu));
 
   function toggleMenu(force = menu.hidden) {
     menu.hidden = !force;
@@ -377,8 +364,7 @@
   });
   // Recharger la page arrête les scripts en cours : on prévient.
   addEventListener("beforeunload", (e) => {
-    if ([...sessions.values()].some((s) => s.phase === "running"))
-      e.preventDefault();
+    if ([...sessions.values()].some((s) => s.phase === "running")) e.preventDefault();
   });
 
   new MutationObserver(() => {
@@ -393,9 +379,7 @@
     if (msg !== "kx-status") return;
     reply({
       scripts: K.scripts.length,
-      running: K.scripts
-        .filter((s) => sessions.get(s.id).phase === "running")
-        .map((s) => s.name),
+      running: K.scripts.filter((s) => sessions.get(s.id).phase === "running").map((s) => s.name),
     });
   });
 
@@ -412,31 +396,15 @@
     }[s.phase];
     const { body, footer } = view(script, s);
     // Aperçu avec beaucoup de colonnes : popover élargi.
-    pop.classList.toggle(
-      "wide",
-      s.phase === "preview" && s.preview?.columns.length > 6,
-    );
+    pop.classList.toggle("wide", s.phase === "preview" && s.preview?.columns.length > 6);
     if (isOpen()) requestAnimationFrame(position);
     pop.replaceChildren(
       h(
         "div",
         { class: "hd" },
         h("span", { class: "ic", "aria-hidden": "true" }, script.icon),
-        h(
-          "div",
-          {},
-          h("h2", { id: "kx-title" }, script.name),
-          h("p", {}, script.description),
-        ),
-        h(
-          "span",
-          { class: "step" },
-          script.skipPreview
-            ? { params: "Réglages", running: "Exécution", done: "Terminé" }[
-                s.phase
-              ]
-            : STEP_LABELS[s.phase],
-        ),
+        h("div", {}, h("h2", { id: "kx-title" }, script.name), h("p", {}, script.description)),
+        h("span", { class: "step" }, script.skipPreview ? { params: "Réglages", running: "Exécution", done: "Terminé" }[s.phase] : STEP_LABELS[s.phase]),
         h(
           "button",
           {
@@ -495,12 +463,7 @@
       const selected = order.filter((r) => inputs[r].checked);
       all.setAttribute("aria-pressed", String(selected.length === order.length));
       buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(inputs[order[i]].checked)));
-      caption.textContent =
-        selected.length === order.length
-          ? "Toutes"
-          : selected.length
-            ? selected.map((r) => K.LABELS[r]).join(" · ")
-            : "Aucune";
+      caption.textContent = selected.length === order.length ? "Toutes" : selected.length ? selected.map((r) => K.LABELS[r]).join(" · ") : "Aucune";
     };
     const all = h(
       "button",
@@ -596,8 +559,7 @@
     const refresh = () => {
       const max = order.indexOf(input.value);
       buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(i <= max)));
-      caption.textContent =
-        input.value === "M" ? "Toutes les raretés" : `Jusqu'à ${K.LABELS[input.value]} (${order.slice(0, max + 1).join(" ")})`;
+      caption.textContent = input.value === "M" ? "Toutes les raretés" : `Jusqu'à ${K.LABELS[input.value]} (${order.slice(0, max + 1).join(" ")})`;
     };
     const buttons = order.map((r) =>
       rarButton(r, {
@@ -610,13 +572,7 @@
       }),
     );
     refresh();
-    return h(
-      "div",
-      { class: "rar-sheet" },
-      input,
-      h("div", { class: "rar-bar max", role: "group", "aria-label": p.label }, buttons),
-      caption,
-    );
+    return h("div", { class: "rar-sheet" }, input, h("div", { class: "rar-bar max", role: "group", "aria-label": p.label }, buttons), caption);
   }
 
   // 1. Réglages
@@ -635,9 +591,7 @@
       control = h(
         "select",
         { name: p.key },
-        p.options.map(([v, label]) =>
-          h("option", { value: v, selected: v === value }, label),
-        ),
+        p.options.map(([v, label]) => h("option", { value: v, selected: v === value }, label)),
       );
     } else if (p.type === "modeToggle") {
       // Sélecteur segmenté : une seule option active, indicateur animé.
@@ -656,9 +610,7 @@
         const i = options.findIndex(([v]) => v === input.value);
         group.style.setProperty("--n", options.length);
         group.style.setProperty("--i", Math.max(0, i));
-        buttons.forEach((b, j) =>
-          b.setAttribute("aria-pressed", String(j === i)),
-        );
+        buttons.forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
       };
       const buttons = options.map(([v, label]) =>
         h(
@@ -731,11 +683,7 @@
         value: value ?? "",
       });
     } else if (p.type === "textarea") {
-      control = h(
-        "textarea",
-        { name: p.key, rows: 3, required: !p.optional },
-        value ?? "",
-      );
+      control = h("textarea", { name: p.key, rows: 3, required: !p.optional }, value ?? "");
     } else {
       control = h("input", {
         type: "text",
@@ -744,26 +692,16 @@
         value: value ?? "",
       });
     }
-    return h(
-      ["raritySet", "rarityMax", "modeToggle", "choice"].includes(p.type) ? "div" : "label",
-      { class: "field" },
-      h("span", {}, p.label),
-      control,
-      help,
-    );
+    return h(["raritySet", "rarityMax", "modeToggle", "choice"].includes(p.type) ? "div" : "label", { class: "field" }, h("span", {}, p.label), control, help);
   }
 
   function readForm(script, form) {
     const values = {};
     for (const p of script.params) {
-      if (p.type === "boolean")
-        values[p.key] = form.elements[p.key].checked;
-      else if (p.type === "number")
-        values[p.key] = Number(form.elements[p.key].value);
+      if (p.type === "boolean") values[p.key] = form.elements[p.key].checked;
+      else if (p.type === "number") values[p.key] = Number(form.elements[p.key].value);
       else if (p.type === "raritySet") {
-        values[p.key] = K.RARITIES.filter(
-          (r) => form.elements[p.key + "." + r].checked,
-        );
+        values[p.key] = K.RARITIES.filter((r) => form.elements[p.key + "." + r].checked);
       } else if (p.type === "rarityMax") {
         values[p.key] = form.elements[p.key].value;
       } else if (p.type === "rarityMap") {
@@ -777,10 +715,7 @@
     return values;
   }
 
-  const matches = (cond, values) =>
-    Object.entries(cond).every(([key, value]) =>
-      Array.isArray(value) ? value.includes(values[key]) : values[key] === value,
-    );
+  const matches = (cond, values) => Object.entries(cond).every(([key, value]) => (Array.isArray(value) ? value.includes(values[key]) : values[key] === value));
 
   function viewParams(script, s) {
     const renderField = (p) => {
@@ -818,14 +753,7 @@
       },
       s.error ? h("ul", { class: "warn-list" }, h("li", {}, `L'aperçu a échoué : ${s.error}`)) : null,
       h("div", { class: "grid" }, renderFields(basic)),
-      advanced.length
-        ? h(
-            "details",
-            {},
-            h("summary", {}, "Réglages avancés"),
-            h("div", { class: "grid" }, renderFields(advanced)),
-          )
-        : null,
+      advanced.length ? h("details", {}, h("summary", {}, "Réglages avancés"), h("div", { class: "grid" }, renderFields(advanced))) : null,
     );
     const syncEnabled = () => {
       const values = readForm(script, form);
@@ -892,11 +820,7 @@
           s.preset ? h("button", { class: "btn link", type: "button", onClick: deletePreset }, "Supprimer") : null,
         ),
         h("button", { class: "btn", type: "button", onClick: close }, "Annuler"),
-        h(
-          "button",
-          { class: "btn primary", type: "submit", form: "kx-form" },
-          script.runLabel ?? (script.skipPreview ? "Lancer" : "Voir l'aperçu →"),
-        ),
+        h("button", { class: "btn primary", type: "submit", form: "kx-form" }, script.runLabel ?? (script.skipPreview ? "Lancer" : "Voir l'aperçu →")),
       ],
     };
   }
@@ -923,8 +847,7 @@
         if (current === id && isOpen()) {
           const list = pop.querySelector(".log");
           if (!list) return;
-          const stick =
-            list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
+          const stick = list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
           list.querySelector(".empty")?.remove();
           list.append(logItem(entry));
           if (stick) list.scrollTop = list.scrollHeight;
@@ -960,17 +883,8 @@
       body: h(
         "div",
         { class: "bd" },
-        h(
-          "div",
-          { class: "loading" },
-          h("span", { class: "spin" }),
-          h("span", { class: "status-text" }, s.statusText),
-        ),
-        h(
-          "p",
-          { class: "empty" },
-          "Lecture seule : rien n'est publié pendant l'aperçu.",
-        ),
+        h("div", { class: "loading" }, h("span", { class: "spin" }), h("span", { class: "status-text" }, s.statusText)),
+        h("p", { class: "empty" }, "Lecture seule : rien n'est publié pendant l'aperçu."),
       ),
       footer: [
         h(
@@ -994,7 +908,9 @@
   const numOf = (r, key) => {
     const v = r.values?.[key] ?? r.cells[key];
     if (typeof v === "number") return v;
-    const m = String(v ?? "").replace(/[\s\u202f\u00a0]/g, "").match(/^[+-]?\d+(?:[.,]\d+)?/);
+    const m = String(v ?? "")
+      .replace(/[\s\u202f\u00a0]/g, "")
+      .match(/^[+-]?\d+(?:[.,]\d+)?/);
     return m ? Number(m[0].replace(",", ".")) : null;
   };
 
@@ -1003,11 +919,7 @@
     const selectable = pv.rows.filter((r) => r.selectable);
     const included = (r) => r.selectable && !s.excluded.has(r.id);
     const count = h("span", { class: "count left" });
-    const confirmBtn = h(
-      "button",
-      { class: "btn primary", type: "button", onClick: () => startRun(script, s) },
-      "Confirmer et lancer",
-    );
+    const confirmBtn = h("button", { class: "btn primary", type: "button", onClick: () => startRun(script, s) }, "Confirmer et lancer");
     const all = h("input", { type: "checkbox", "aria-label": "Tout cocher" });
     const totals = pv.columns.some((c) => c.total)
       ? pv.columns.map((c, i) => (c.total ? h("td", { class: "end" }) : h("td", {}, i === 0 ? "Total (cochées)" : "")))
@@ -1024,7 +936,10 @@
       });
     };
     // Remarque et pastille de rareté dans la première colonne de texte (nom de la carte…).
-    const noteCol = Math.max(0, pv.columns.findIndex((c) => c.align !== "end"));
+    const noteCol = Math.max(
+      0,
+      pv.columns.findIndex((c) => c.align !== "end"),
+    );
     const setIncluded = (r, tr, on) => {
       on ? s.excluded.delete(r.id) : s.excluded.add(r.id);
       tr.classList.toggle("off", !on);
@@ -1055,9 +970,7 @@
             h(
               "td",
               { class: c.align === "end" ? "end" : "" },
-              i === noteCol && r.rarity
-                ? h("span", { class: "rdot", style: `--rc:${K.COLORS[r.rarity]}`, title: K.LABELS[r.rarity] })
-                : null,
+              i === noteCol && r.rarity ? h("span", { class: "rdot", style: `--rc:${K.COLORS[r.rarity]}`, title: K.LABELS[r.rarity] }) : null,
               String(r.cells[c.key] ?? ""),
               i === noteCol && r.note ? h("span", { class: "note" }, r.note) : null,
             ),
@@ -1092,7 +1005,13 @@
         "div",
         { class: "bd" },
         h("p", { class: "summary" }, pv.summary),
-        pv.warnings?.length ? h("ul", { class: "warn-list" }, pv.warnings.map((w) => h("li", {}, w))) : null,
+        pv.warnings?.length
+          ? h(
+              "ul",
+              { class: "warn-list" },
+              pv.warnings.map((w) => h("li", {}, w)),
+            )
+          : null,
         pv.rows.length
           ? h(
               "div",
@@ -1122,13 +1041,7 @@
                   ),
                 ),
                 tbody,
-                totals
-                  ? h(
-                      "tfoot",
-                      {},
-                      h("tr", {}, h("td", { class: "sel" }), totals),
-                    )
-                  : null,
+                totals ? h("tfoot", {}, h("tr", {}, h("td", { class: "sel" }), totals)) : null,
               ),
             )
           : null,
@@ -1191,13 +1104,7 @@
     rerender(script.id);
   }
 
-  const logItem = ({ at, msg, tone }) =>
-    h(
-      "li",
-      {},
-      h("time", {}, at.toLocaleTimeString("fr-FR")),
-      h("span", { class: tone }, msg),
-    );
+  const logItem = ({ at, msg, tone }) => h("li", {}, h("time", {}, at.toLocaleTimeString("fr-FR")), h("span", { class: tone }, msg));
 
   async function copyLog(s, button) {
     const text = s.logs.map(({ at, msg }) => `${at.toLocaleTimeString("fr-FR")}  ${msg}`).join("\n");
@@ -1213,17 +1120,11 @@
   function viewRun(script, s) {
     const running = s.phase === "running";
     const stopping = running && s.controller.signal.aborted;
-    const copy = h(
-      "button",
-      { class: "btn link left", type: "button", onClick: () => copyLog(s, copy) },
-      "Copier le journal",
-    );
+    const copy = h("button", { class: "btn link left", type: "button", onClick: () => copyLog(s, copy) }, "Copier le journal");
     const list = h(
       "ul",
       { class: "log", "aria-live": "polite" },
-      s.logs.length
-        ? s.logs.map(logItem)
-        : h("li", { class: "empty" }, "Aucun message pour l'instant."),
+      s.logs.length ? s.logs.map(logItem) : h("li", { class: "empty" }, "Aucun message pour l'instant."),
     );
     requestAnimationFrame(() => {
       list.scrollTop = list.scrollHeight;
@@ -1236,11 +1137,7 @@
           "div",
           { class: `status${running ? "" : " done"}` },
           h("span", { class: "spin" }),
-          h(
-            "span",
-            { class: "status-text" },
-            running ? s.statusText : `Terminé. ${s.statusText}`,
-          ),
+          h("span", { class: "status-text" }, running ? s.statusText : `Terminé. ${s.statusText}`),
         ),
         list,
       ),

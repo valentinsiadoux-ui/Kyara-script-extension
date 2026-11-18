@@ -29,8 +29,7 @@
   }
 
   // Je reçois Y contre X : OK si Y est aussi rare ou plus rare que X, sans dépasser la rareté max demandée.
-  const wantOk = (p, give, want) =>
-    (p.allowEqualRarity ? rank(want) <= rank(give) : rank(want) < rank(give)) && atMost(want, p.maxWantRarity);
+  const wantOk = (p, give, want) => (p.allowEqualRarity ? rank(want) <= rank(give) : rank(want) < rank(give)) && atMost(want, p.maxWantRarity);
 
   function plan(p, catalog, { collectionRows, open, listedIds }, slots, excludedIds = new Set()) {
     const owned = new Map(collectionRows.map((e) => [e.characterId, e]));
@@ -40,11 +39,10 @@
 
     // Une carte déjà mise aux enchères (ou en vente) n'est jamais échangée.
     const busy = new Set([...alreadyOffered, ...listedIds, ...excludedIds]);
-    const candidates = spares(collectionRows, catalog, { keepCopies: p.keepCopies, rarities: p.giveRarities, busy })
-      .sort((a, b) => {
-        const byRarity = rank(a.card.rarity) - rank(b.card.rarity);
-        return (p.giveOrder === "commonest" ? -byRarity : byRarity) || a.card.name.localeCompare(b.card.name, "fr");
-      });
+    const candidates = spares(collectionRows, catalog, { keepCopies: p.keepCopies, rarities: p.giveRarities, busy }).sort((a, b) => {
+      const byRarity = rank(a.card.rarity) - rank(b.card.rarity);
+      return (p.giveOrder === "commonest" ? -byRarity : byRarity) || a.card.name.localeCompare(b.card.name, "fr");
+    });
 
     const missing = [...catalog.values()].filter((c) => !(owned.get(c.id)?.qty > 0));
     const result = [];
@@ -55,7 +53,7 @@
         .sort((a, b) =>
           p.wantOrder === "closest"
             ? rank(b.rarity) - rank(a.rarity) || a.name.localeCompare(b.name, "fr")
-            : rank(a.rarity) - rank(b.rarity) || a.name.localeCompare(b.name, "fr")
+            : rank(a.rarity) - rank(b.rarity) || a.name.localeCompare(b.name, "fr"),
         )
         .slice(0, p.maxWanted);
       if (wanted.length === 0) continue;
@@ -79,19 +77,45 @@
     short: "Doublons contre cartes manquantes",
     description: "Publie des offres d'échange avec mes doublons contre des cartes qui me manquent, de rareté égale ou supérieure.",
     params: [
+      { key: "giveRarities", label: "Raretés de mes doublons à proposer", type: "raritySet", default: ["C", "U", "R", "E"] },
+      {
+        key: "maxWantRarity",
+        label: "Rareté max demandée",
+        type: "rarityMax",
+        default: "L",
+        help: "Une offre qui demande trop rare n'est presque jamais prise.",
+      },
       { key: "totalOffers", label: "Offres à publier au total", type: "number", default: 20, min: 1, max: 500 },
       { key: "maxOpenOffers", label: "Offres ouvertes en même temps", type: "number", default: 5, min: 1, max: 50, help: "Limite du site : 5." },
       { key: "keepCopies", label: "Exemplaires à toujours garder", type: "number", default: 1, min: 0, max: 50 },
       { key: "maxWanted", label: "Cartes demandées par offre", type: "number", default: 5, min: 1, max: 20 },
-      { key: "giveOrder", label: "Doublons proposés en premier", type: "select", default: "rarest",
-        options: [["rarest", "Les plus rares"], ["commonest", "Les plus communs"]] },
-      { key: "wantOrder", label: "Cartes demandées en premier", type: "select", default: "closest",
-        options: [["closest", "Rareté la plus proche"], ["rarest", "Les plus rares"]] },
-      { key: "allowEqualRarity", label: "Accepter une rareté égale", type: "boolean", default: true,
-        help: "Décoché : exiger une rareté strictement supérieure à la carte donnée." },
-      { key: "giveRarities", label: "Raretés de mes doublons à proposer", type: "raritySet", default: ["C", "U", "R", "E"] },
-      { key: "maxWantRarity", label: "Rareté max demandée", type: "rarityMax", default: "L",
-        help: "Une offre qui demande trop rare n'est presque jamais prise." },
+      {
+        key: "giveOrder",
+        label: "Doublons proposés en premier",
+        type: "select",
+        default: "rarest",
+        options: [
+          ["rarest", "Les plus rares"],
+          ["commonest", "Les plus communs"],
+        ],
+      },
+      {
+        key: "wantOrder",
+        label: "Cartes demandées en premier",
+        type: "select",
+        default: "closest",
+        options: [
+          ["closest", "Rareté la plus proche"],
+          ["rarest", "Les plus rares"],
+        ],
+      },
+      {
+        key: "allowEqualRarity",
+        label: "Accepter une rareté égale",
+        type: "boolean",
+        default: true,
+        help: "Décoché : exiger une rareté strictement supérieure à la carte donnée.",
+      },
       { key: "pollSec", label: "Vérification d'une place libre (s)", type: "number", default: 60, min: 10, max: 3600, group: "advanced" },
       { key: "delayMs", label: "Pause entre deux publications (ms)", type: "number", default: 1500, min: 0, max: 60000, group: "advanced" },
       { key: "maxFailures", label: "Arrêt après N cycles en échec", type: "number", default: 3, min: 1, max: 20, group: "advanced" },
@@ -108,7 +132,7 @@
       // Sans place libre, on montre quand même les prochaines offres qui partiront.
       const slots = Math.min(freeSlots > 0 ? freeSlots : p.maxOpenOffers, p.totalOffers);
       // Plan large pour pouvoir décocher des lignes et garder des remplaçantes.
-      const todo = plan(p, base.catalog, s, Math.min(p.totalOffers, slots + 10));
+      const todo = plan(p, catalog, s, Math.min(p.totalOffers, slots + 10));
 
       const warnings = [];
       if (freeSlots <= 0) warnings.push(`${s.open.length}/${p.maxOpenOffers} offres déjà ouvertes : la publication attendra qu'une place se libère.`);
@@ -185,7 +209,10 @@
           // Dernière vérification : une enchère a pu être lancée (par un autre script ou à la main) depuis le début du cycle.
           const { listings } = await ctx.busyCards();
           if (listings.some((l) => (l.character?.id ?? l.characterId) === t.giveId)) {
-            ctx.log(`${catalog.get(t.giveId)?.name ?? `Carte ${t.giveId}`} vient d'être mise en vente / aux enchères : offre annulée pour cette carte.`, "info");
+            ctx.log(
+              `${catalog.get(t.giveId)?.name ?? `Carte ${t.giveId}`} vient d'être mise en vente / aux enchères : offre annulée pour cette carte.`,
+              "info",
+            );
             continue;
           }
           await ctx.api(p.endpoint, { method: "POST", body: buildBody(t.giveId, t.wantIds), withPass: true });

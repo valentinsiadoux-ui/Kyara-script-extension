@@ -27,13 +27,30 @@
       { key: "rarities", label: "Raretés", type: "raritySet", default: ["R", "E", "L"] },
       { key: "maxRarity", label: "Rareté max", type: "rarityMax", default: "L" },
       { key: "percent", label: "Prix (% de la médiane 7 j)", type: "number", default: 70, min: 1, max: 100, row: "prix" },
-      { key: "outbid", label: "Au-dessus du meilleur ordre de (◆)", type: "number", default: 1, min: 0, max: 100000, row: "prix",
-        title: "Si un autre joueur paie déjà plus que ton prix, l'ordre est ignoré ; sinon il passe juste devant lui, sans dépasser ton prix." },
+      {
+        key: "outbid",
+        label: "Au-dessus du meilleur ordre de (◆)",
+        type: "number",
+        default: 1,
+        min: 0,
+        max: 100000,
+        row: "prix",
+        title: "Si un autre joueur paie déjà plus que ton prix, l'ordre est ignoré ; sinon il passe juste devant lui, sans dépasser ton prix.",
+      },
       { key: "budget", label: "Budget total (◆)", type: "number", default: 5000, min: 1, max: 100000000, row: "budget" },
       { key: "maxOrders", label: "Ordres max", type: "number", default: 10, min: 1, max: 200, row: "budget" },
       { key: "maxPrice", label: "Prix max par carte (◆, 0 = aucun)", type: "number", default: 0, min: 0, max: 100000000, group: "advanced" },
-      { key: "order", label: "Cartes en premier", type: "select", default: "rarest", group: "advanced",
-        options: [["rarest", "Les plus rares"], ["cheapest", "Les moins chères"]] },
+      {
+        key: "order",
+        label: "Cartes en premier",
+        type: "select",
+        default: "rarest",
+        group: "advanced",
+        options: [
+          ["rarest", "Les plus rares"],
+          ["cheapest", "Les moins chères"],
+        ],
+      },
       { key: "delayMs", label: "Pause entre deux ordres (ms)", type: "number", default: 1500, min: 0, max: 60000, group: "advanced" },
       { key: "endpoint", label: "Endpoint de création (à vérifier)", type: "text", default: "/market/buy-orders", group: "advanced" },
     ],
@@ -61,7 +78,8 @@
         .sort((a, b) => (p.order === "cheapest" ? a.target - b.target : K.rank(a.card.rarity) - K.rank(b.card.rarity) || b.ref - a.ref));
 
       const rows = [];
-      let spent = 0, outbidded = 0;
+      let spent = 0,
+        outbidded = 0;
       for (const x of priced) {
         if (rows.length >= p.maxOrders) break;
         ctx.status(`Ordres concurrents : ${rows.length + 1} — ${x.card.name}`);
@@ -113,7 +131,8 @@
 
     async run(ctx, p, { excludedIds, state }) {
       const queue = state.rows.filter((r) => !excludedIds.has(r.card.id));
-      let done = 0, failures = 0;
+      let done = 0,
+        failures = 0;
       for (const r of queue) {
         ctx.checkStopped();
         ctx.status(`Ordre ${done + 1}/${queue.length} : ${r.card.name}…`);

@@ -36,7 +36,10 @@
   const DOTS = { C: "⚪", U: "🟢", R: "🔵", E: "🟣", L: "🟡", M: "🔴" };
   // Recyclage du client du site, si /config ne le donne pas.
   const RECYCLE = { C: 1, U: 1, R: 3, E: 10, L: 40, M: 150 };
-  const rank = (r) => { const i = RARITIES.indexOf(r); return i === -1 ? RARITIES.length : i; };
+  const rank = (r) => {
+    const i = RARITIES.indexOf(r);
+    return i === -1 ? RARITIES.length : i;
+  };
   // « au plus Épique » : C, U, R, E.
   const atMost = (r, max) => !max || rank(r) >= rank(max);
   const atLeast = (r, min) => !min || rank(r) <= rank(min);
@@ -55,21 +58,33 @@
     try {
       const p = JSON.parse(localStorage.getItem("kyara_pass"));
       return p && p.expiresAt > Date.now() ? p.pass : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   };
 
   class StoppedError extends Error {
-    constructor() { super("Arrêt demandé"); this.name = "StoppedError"; }
+    constructor() {
+      super("Arrêt demandé");
+      this.name = "StoppedError";
+    }
   }
   class ApiError extends Error {
-    constructor(status, code, message) { super(message); this.name = "ApiError"; this.status = status; this.code = code; }
+    constructor(status, code, message) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+      this.code = code;
+    }
   }
 
   // ---------- Débit des requêtes ----------
   // File commune à tous les scripts : 250 ms au moins entre deux requêtes (× x-kyara-rush quand le site
   // est chargé), comme Kyara Plus. Le site limite à 300 requêtes par minute.
-  const MIN_GAP_MS = 250, JITTER_MS = 150;
-  let nextSlot = 0, rush = 1;
+  const MIN_GAP_MS = 250,
+    JITTER_MS = 150;
+  let nextSlot = 0,
+    rush = 1;
   function takeTurn() {
     const now = Date.now();
     const at = Math.max(now, nextSlot);
@@ -79,7 +94,8 @@
 
   function describe(status, data, path, withPass) {
     if (status === 401) return "Session expirée : recharge la page Kyara puis relance.";
-    if (withPass && status === 403 && !readPass()) return "Code d'accès requis : entre-le sur le site (n'importe quelle action protégée le demande), puis relance.";
+    if (withPass && status === 403 && !readPass())
+      return "Code d'accès requis : entre-le sur le site (n'importe quelle action protégée le demande), puis relance.";
     return `HTTP ${status} – ${data?.message ?? data?.error ?? path}`;
   }
 
@@ -89,20 +105,30 @@
   function cached(key, load) {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise;
-    const promise = load().catch((e) => { cache.delete(key); throw e; });
+    const promise = load().catch((e) => {
+      cache.delete(key);
+      throw e;
+    });
     cache.set(key, { at: Date.now(), promise });
     return promise;
   }
 
   // Contexte passé aux scripts : API du site, pauses interruptibles, journal et statut affichés dans le popover.
   function createContext({ signal, log, status }) {
-    const sleep = (ms) => new Promise((resolve) => {
-      if (signal.aborted) return resolve();
-      const timer = setTimeout(done, ms);
-      function done() { clearTimeout(timer); signal.removeEventListener("abort", done); resolve(); }
-      signal.addEventListener("abort", done, { once: true });
-    });
-    const checkStopped = () => { if (signal.aborted) throw new StoppedError(); };
+    const sleep = (ms) =>
+      new Promise((resolve) => {
+        if (signal.aborted) return resolve();
+        const timer = setTimeout(done, ms);
+        function done() {
+          clearTimeout(timer);
+          signal.removeEventListener("abort", done);
+          resolve();
+        }
+        signal.addEventListener("abort", done, { once: true });
+      });
+    const checkStopped = () => {
+      if (signal.aborted) throw new StoppedError();
+    };
 
     async function api(path, { method = "GET", body, withPass = false } = {}) {
       for (let attempt = 0; attempt < 5; attempt++) {
@@ -125,14 +151,24 @@
         rush = Number(res.headers.get("x-kyara-rush")) || 1;
         const data = await res.json().catch(() => null);
         if (res.ok) return data;
-        if ((res.status === 429 || res.status === 503) && attempt < 4) { await sleep(2000 * 2 ** attempt); continue; }
+        if ((res.status === 429 || res.status === 503) && attempt < 4) {
+          await sleep(2000 * 2 ** attempt);
+          continue;
+        }
         throw new ApiError(res.status, data?.error ?? `http_${res.status}`, describe(res.status, data, path, withPass));
       }
     }
 
     const ctx = {
-      api, sleep, log, status, signal, checkStopped,
-      get stopped() { return signal.aborted; },
+      api,
+      sleep,
+      log,
+      status,
+      signal,
+      checkStopped,
+      get stopped() {
+        return signal.aborted;
+      },
       // Catalogue (Map id -> carte) et joueur connecté, gardés 10 min pour toute la page.
       catalog: () => cached("catalog", async () => new Map((await api("/characters")).map((c) => [c.id, c]))),
       me: () => cached("me", async () => (await api("/me/bootstrap")).me),
@@ -200,8 +236,26 @@
   }
 
   Object.assign(K, {
-    RARITIES, RARITIES_ASC, LABELS, COLORS, DOTS, RECYCLE,
-    rank, atMost, atLeast, recycleOf, fmt, chunk, netSale, readPass,
-    createContext, loadPrices, busyCards, spares, register, StoppedError, ApiError,
+    RARITIES,
+    RARITIES_ASC,
+    LABELS,
+    COLORS,
+    DOTS,
+    RECYCLE,
+    rank,
+    atMost,
+    atLeast,
+    recycleOf,
+    fmt,
+    chunk,
+    netSale,
+    readPass,
+    createContext,
+    loadPrices,
+    busyCards,
+    spares,
+    register,
+    StoppedError,
+    ApiError,
   });
 })();

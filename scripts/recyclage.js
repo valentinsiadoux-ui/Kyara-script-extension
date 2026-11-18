@@ -19,8 +19,16 @@
     description: "Recycle les doublons dont la vente rapporterait moins que le recyclage (taxe et frais déduits), ou peu au-dessus.",
     params: [
       { key: "rarities", label: "Raretés", type: "raritySet", default: ["C", "U", "R"] },
-      { key: "margin", label: "Recycler si le net de vente ≤ recyclage × ", type: "number", default: 1, min: 0.1, max: 100, step: 0.1,
-        help: "1 : seulement quand vendre ne rapporte pas plus. 2 : aussi quand la vente rapporterait jusqu'au double." },
+      {
+        key: "margin",
+        label: "Recycler si le net de vente ≤ recyclage × ",
+        type: "number",
+        default: 1,
+        min: 0.1,
+        max: 100,
+        step: 0.1,
+        help: "1 : seulement quand vendre ne rapporte pas plus. 2 : aussi quand la vente rapporterait jusqu'au double.",
+      },
       { key: "keepCopies", label: "Exemplaires à toujours garder", type: "number", default: 1, min: 0, max: 50 },
       { key: "noPrice", label: "Recycler aussi les cartes sans prix de marché", type: "boolean", default: false },
       { key: "delayMs", label: "Pause entre deux cartes (ms)", type: "number", default: 800, min: 0, max: 60000, group: "advanced" },
@@ -29,12 +37,7 @@
     async preview(ctx, p) {
       if (!p.rarities.length) throw new Error("Choisis au moins une rareté.");
       ctx.status("Lecture de la collection et des annonces…");
-      const [catalog, collection, busy, config] = await Promise.all([
-        ctx.catalog(),
-        ctx.api("/me/collection?lean=1"),
-        ctx.busyCards(),
-        ctx.config(),
-      ]);
+      const [catalog, collection, busy, config] = await Promise.all([ctx.catalog(), ctx.api("/me/collection?lean=1"), ctx.busyCards(), ctx.config()]);
       const spares = K.spares(collection, catalog, { keepCopies: p.keepCopies, rarities: p.rarities, busy: busy.ids });
       const prices = await ctx.loadPrices(spares.map((x) => x.card.id));
       const rows = spares
@@ -85,7 +88,8 @@
 
     async run(ctx, p, { excludedIds, state }) {
       const queue = state.rows.filter((r) => !excludedIds.has(r.card.id));
-      let done = 0, gained = 0;
+      let done = 0,
+        gained = 0;
       for (const r of queue) {
         ctx.checkStopped();
         ctx.status(`Recyclage ${done + 1}/${queue.length} : ${r.card.name}…`);

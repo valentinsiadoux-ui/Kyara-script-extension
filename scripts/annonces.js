@@ -11,7 +11,10 @@
   const K = globalThis.KyaraExt;
   const { LABELS, fmt } = K;
 
-  const dots = (set) => K.RARITIES_ASC.filter((r) => set.includes(r)).map((r) => K.DOTS[r]).join("");
+  const dots = (set) =>
+    K.RARITIES_ASC.filter((r) => set.includes(r))
+      .map((r) => K.DOTS[r])
+      .join("");
   const KINDS = [
     ["vendre", "💰 Je vends"],
     ["acheter", "🛒 J'achète"],
@@ -33,7 +36,8 @@
 
   function findCards(names, catalog) {
     const byName = new Map([...catalog.values()].map((c) => [normalize(c.name), c]));
-    const found = [], unknown = [];
+    const found = [],
+      unknown = [];
     for (const name of names) {
       const c = byName.get(normalize(name));
       c ? found.push(c) : unknown.push(name);
@@ -63,37 +67,67 @@
     params: [
       { key: "kind", label: "Annonce", type: "choice", default: "vendre", options: KINDS },
       {
-        key: "giveRarities", label: "Mes doublons", type: "raritySet", default: ["C", "U", "R"],
+        key: "giveRarities",
+        label: "Mes doublons",
+        type: "raritySet",
+        default: ["C", "U", "R"],
         enabledWhen: { kind: ["vendre", "echanger"] },
       },
       {
-        key: "wantRarities", label: "Cartes recherchées", type: "raritySet", default: ["E", "L"],
+        key: "wantRarities",
+        label: "Cartes recherchées",
+        type: "raritySet",
+        default: ["E", "L"],
         enabledWhen: { kind: ["acheter", "echanger"] },
       },
       {
-        key: "discount", label: "Remise sur la médiane (%)", type: "number", default: 40, min: 0, max: 99,
+        key: "discount",
+        label: "Remise sur la médiane (%)",
+        type: "number",
+        default: 40,
+        min: 0,
+        max: 99,
         enabledWhen: { kind: ["vendre", "acheter"] },
       },
       {
-        key: "showCount", label: "Indiquer le nombre de doublons", type: "boolean", default: true,
+        key: "showCount",
+        label: "Indiquer le nombre de doublons",
+        type: "boolean",
+        default: true,
         help: "Doublons vendables de ta collection pour les raretés choisies (hors épinglées), arrondi (+4 000).",
         enabledWhen: { kind: ["vendre", "echanger"] },
       },
       {
-        key: "keepCopies", label: "Exemplaires gardés (non comptés)", type: "number", default: 1, min: 0, max: 50,
-        enabledWhen: { kind: ["vendre", "echanger"], showCount: true }, group: "advanced",
+        key: "keepCopies",
+        label: "Exemplaires gardés (non comptés)",
+        type: "number",
+        default: 1,
+        min: 0,
+        max: 50,
+        enabledWhen: { kind: ["vendre", "echanger"], showCount: true },
+        group: "advanced",
       },
       {
-        key: "cards", label: "Cartes cherchées (séparées par des virgules)", type: "text", default: "",
+        key: "cards",
+        label: "Cartes cherchées (séparées par des virgules)",
+        type: "text",
+        default: "",
         help: "Une seule carte : elle est jointe à l'annonce (bouton « Faire une offre »).",
         enabledWhen: { kind: "chercher" },
       },
       {
-        key: "extra", label: "Texte en plus (facultatif ; tout le message en mode Libre)", type: "textarea",
-        default: "", optional: true,
+        key: "extra",
+        label: "Texte en plus (facultatif ; tout le message en mode Libre)",
+        type: "textarea",
+        default: "",
+        optional: true,
       },
       {
-        key: "room", label: "Salon", type: "select", default: "auto", group: "advanced",
+        key: "room",
+        label: "Salon",
+        type: "select",
+        default: "auto",
+        group: "advanced",
         options: [["auto", "Celui attribué par le site"], ...[1, 2, 3, 4, 5].map((n) => [String(n), `Salon ${n}`])],
       },
     ],
@@ -106,7 +140,8 @@
         needsCatalog ? ctx.catalog() : new Map(),
         needsCatalog && p.kind !== "chercher" ? ctx.api("/me/collection?lean=1") : null,
       ]);
-      const blocking = [], notes = [];
+      const blocking = [],
+        notes = [];
 
       if (["vendre", "echanger"].includes(p.kind) && !p.giveRarities.length) blocking.push("Choisis au moins une rareté de doublons.");
       if (["acheter", "echanger"].includes(p.kind) && !p.wantRarities.length) blocking.push("Choisis au moins une rareté recherchée.");
@@ -114,7 +149,13 @@
       const dupes = collection ? duplicates(collection, catalog, p) : 0;
       let cards = [];
       if (p.kind === "chercher") {
-        const { found, unknown } = findCards(p.cards.split(",").map((s) => s.trim()).filter(Boolean), catalog);
+        const { found, unknown } = findCards(
+          p.cards
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          catalog,
+        );
         cards = found;
         if (unknown.length) notes.push(`Carte(s) introuvable(s), ignorée(s) : ${unknown.join(", ")}.`);
         if (!found.length) notes.push("Aucune carte cherchée reconnue.");
@@ -125,7 +166,10 @@
       if (!text) blocking.push("Le message est vide.");
       if (text.length > max) blocking.push(`Message trop long : ${text.length}/${max} caractères.`);
       if (status && !status.canPost) blocking.push(`Le site refuse encore tes messages : ${(status.reasons ?? []).join(" ")}`);
-      if (status?.mutedUntil) blocking.push(`Tu es réduit au silence jusqu'au ${new Date(status.mutedUntil).toLocaleString("fr-FR")}${status.muteReason ? ` (${status.muteReason})` : ""}.`);
+      if (status?.mutedUntil)
+        blocking.push(
+          `Tu es réduit au silence jusqu'au ${new Date(status.mutedUntil).toLocaleString("fr-FR")}${status.muteReason ? ` (${status.muteReason})` : ""}.`,
+        );
 
       const card = p.kind === "chercher" && cards.length === 1 ? { characterId: cards[0].id, tag: "seek" } : undefined;
       return {
@@ -136,15 +180,17 @@
           { key: "card", label: "Carte jointe" },
           { key: "length", label: "Caractères", align: "end" },
         ],
-        rows: [{
-          id: "msg",
-          selectable: false,
-          cells: {
-            text,
-            card: card ? `${cards[0].name} (${LABELS[cards[0].rarity] ?? cards[0].rarity})` : "—",
-            length: `${text.length}/${max}`,
+        rows: [
+          {
+            id: "msg",
+            selectable: false,
+            cells: {
+              text,
+              card: card ? `${cards[0].name} (${LABELS[cards[0].rarity] ?? cards[0].rarity})` : "—",
+              length: `${text.length}/${max}`,
+            },
           },
-        }],
+        ],
         canRun: blocking.length === 0,
         state: { text, card },
       };

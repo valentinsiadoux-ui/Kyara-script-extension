@@ -31,8 +31,20 @@
   const MIN_PRICE_ERROR = /prix minimum[^0-9]*([\d\s  .,]+)/i;
   // Minimums appris lors d'un refus, gardés d'un lancement à l'autre.
   const LEARNED_KEY = "kx_min_price_by_rarity";
-  const learnedMins = () => { try { return JSON.parse(localStorage.getItem(LEARNED_KEY)) ?? {}; } catch { return {}; } };
-  const learnMin = (rarity, min) => { try { localStorage.setItem(LEARNED_KEY, JSON.stringify({ ...learnedMins(), [rarity]: min })); } catch { /* non mémorisé */ } };
+  const learnedMins = () => {
+    try {
+      return JSON.parse(localStorage.getItem(LEARNED_KEY)) ?? {};
+    } catch {
+      return {};
+    }
+  };
+  const learnMin = (rarity, min) => {
+    try {
+      localStorage.setItem(LEARNED_KEY, JSON.stringify({ ...learnedMins(), [rarity]: min }));
+    } catch {
+      /* non mémorisé */
+    }
+  };
   const minPriceFromError = (error) => {
     const m = MIN_PRICE_ERROR.exec(error?.message ?? "");
     return m ? Number(m[1].replace(/[^\d]/g, "")) || null : null;
@@ -49,7 +61,10 @@
       if (!more || items.length === 0) break;
     }
     // Valeur de ce que chaque chercheur propose en échange = ce qu'il est prêt à « payer ».
-    await ctx.loadPrices(offers.map((o) => o.characterId), prices);
+    await ctx.loadPrices(
+      offers.map((o) => o.characterId),
+      prices,
+    );
     const byCard = new Map(); // id -> { seekers: Set, offered: [valeurs] }
     for (const o of offers) {
       const offered = prices.get(o.characterId)?.value ?? null;
@@ -68,14 +83,14 @@
     const found = [];
     for (let page = 1; page <= p.listingPages; page++) {
       const data = await ctx.api(`/market/listings?characterId=${card.id}&type=auction&sort=ending&page=${page}&pageSize=24`);
-      const items = Array.isArray(data) ? data : data?.items ?? [];
+      const items = Array.isArray(data) ? data : (data?.items ?? []);
       for (const l of items) {
         const sameCard = (l.character?.id ?? l.characterId) === card.id;
         const active = l.status == null || l.status === "active";
         if (sameCard && active && !l.isMine && typeof (l.currentBid ?? l.price) === "number")
           found.push({ price: l.currentBid ?? l.price, buyout: l.buyoutPrice ?? null, bids: l.bidCount ?? 0 });
       }
-      const more = Array.isArray(data) ? items.length >= 24 : data?.more ?? items.length >= 24;
+      const more = Array.isArray(data) ? items.length >= 24 : (data?.more ?? items.length >= 24);
       if (!more || items.length === 0) break;
     }
     return found;
@@ -124,7 +139,10 @@
     if (p.stayUnderRivals && lowest != null) {
       const underRivals = lowest - Math.max(1, Math.round((lowest * p.undercutPct) / 100));
       if (underRivals < floor)
-        return { ...facts, skip: `concurrence trop basse (${fmt(lowest)} ◆) pour rester au-dessus ${floor > recycleFloor ? "du prix minimum du site" : "du recyclage"} (≥ ${fmt(floor)} ◆)` };
+        return {
+          ...facts,
+          skip: `concurrence trop basse (${fmt(lowest)} ◆) pour rester au-dessus ${floor > recycleFloor ? "du prix minimum du site" : "du recyclage"} (≥ ${fmt(floor)} ◆)`,
+        };
       start = Math.min(start, underRivals);
     }
     start = Math.max(Math.round(start), floor);
