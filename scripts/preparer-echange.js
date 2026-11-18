@@ -94,6 +94,38 @@
     }
     return ids;
   }
+  // Doubles manquants des deux côtés lus par l'API (comme Kyara Plus) : [mes doublons qui lui manquent,
+  // ses doublons qui me manquent], ids -> rareté. null hors d'un profil ou si l'API échoue : filtres du site seuls.
+  async function apiPools(ctx) {
+    const userId = location.pathname.match(/^\/profil\/([^/?#]+)/)?.[1];
+    if (!userId) return null;
+    try {
+      ctx.status("Lecture des inventaires…");
+      const [catalog, mine, owned, available] = await Promise.all([
+        ctx.catalog(),
+        ctx.api("/me/collection?lean=1"),
+        ctx.api(`/trades/owned/${encodeURIComponent(userId)}`),
+        ctx.api(`/trades/available/${encodeURIComponent(userId)}`),
+      ]);
+      const theyOwn = new Set(owned.map(String));
+      const iOwn = new Set(mine.filter((e) => e.qty > 0).map((e) => String(e.characterId)));
+      const give = new Map(
+        K.spares(mine, catalog, { keepCopies: 1 })
+          .filter((x) => !theyOwn.has(String(x.card.id)))
+          .map((x) => [String(x.card.id), x.card.rarity]),
+      );
+      const receive = new Map(
+        available
+          .filter((r) => r.n >= 2 && !iOwn.has(String(r.characterId)))
+          .map((r) => [String(r.characterId), catalog.get(r.characterId)?.rarity]),
+      );
+      return [give, receive];
+    } catch (e) {
+      if (e instanceof K.StoppedError) throw e;
+      ctx.log(`Inventaires illisibles par l'API (${e.message}) : filtres du site seuls.`, "warn");
+      return null;
+    }
+  }
   function guard(ctx, form) {
     ctx.checkStopped();
     if (!form.isConnected || currentForm() !== form)
@@ -422,7 +454,18 @@
       // Échange : deux côtés ; Achat : ses doublons seuls ; Vente : mes doublons seuls ; Compléter : le côté le moins chargé.
       const sides = complete ? [fill] : { trade: [0, 1], buy: [1], sell: [0] }[p.mode];
       const ids = await reserved(ctx);
+      const api = await apiPools(ctx);
       guard(ctx, form);
+      // Rien d'éligible d'après l'API : inutile de charger les inventaires du site.
+      const noneLeft = api && sides.filter((side) => {
+        const allowed = raritiesOf(p, side);
+        return ![...api[side]].some(([id, r]) => allowed.includes(r) && (side === 0 || !ids.has(id)));
+      });
+      if (noneLeft?.length && ((trade && p.balance) || noneLeft.length === sides.length)) {
+        ctx.status("Aucun double manquant éligible.");
+        ctx.log(`Aucun double manquant éligible côté « ${noneLeft.map((side) => labels[side]).join(" » et « ")} » avec ces raretés. Aucune carte ajoutée.`, "warn");
+        return;
+      }
       const counts = [0, 0];
       const pools = [[], []];
       for (const side of sides) {
@@ -490,7 +533,7 @@
             }));
           if (cards.some(c => !c.id)) throw new Error("Identifiant de carte introuvable dans un inventaire.");
           if (cards.some(c => !K.RARITIES.includes(c.rarity))) throw new Error("Rareté de carte illisible. Préparation arrêtée.");
-          const eligible = cards.filter(c => allowed.has(c.rarity) && !placed.has(c.id) && (side === 0 || !ids.has(c.id)));
+          const eligible = cards.filter(c => allowed.has(c.rarity) && !placed.has(c.id) && (side === 0 || !ids.has(c.id)) && (!api || api[side].has(c.id)));
           missingPrice = eligible.find(c => c.value === null)?.name || "";
           if (needPrices && missingPrice) return false;
           pools[side] = [...new Map(eligible.map(c => [c.id, c])).values()];

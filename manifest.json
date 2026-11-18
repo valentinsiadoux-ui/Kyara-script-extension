@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kyara Scripts",
-  "version": "1.0.9",
+  "version": "2.0.0",
   "description": "Lance des scripts sur kyara.games depuis des boutons, avec réglages et aperçu avant exécution.",
   "permissions": [
     "storage"
@@ -36,6 +36,9 @@
         "scripts/annonces.js",
         "scripts/lib/marche.js",
         "scripts/vente.js",
+        "scripts/ordres-achat.js",
+        "scripts/recyclage.js",
+        "scripts/tableau-de-bord.js",
         "ui/styles.js",
         "ui/content.js"
       ]

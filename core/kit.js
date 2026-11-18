@@ -17,6 +17,7 @@
  *   preview(ctx, params)  -> { summary, warnings, columns, rows, canRun, state }
  *             columns : [{ key, label, align: "end", total: true }]
  *             rows    : [{ id, cells, values, rarity, selectable, note }]
+ *             excluded : ids des lignes décochées d'office
  *                       values : nombres par colonne (tri et totaux), sinon on lit cells
  *             Rien n'est publié pendant l'aperçu.
  *   run(ctx, params, { excludedIds, state })

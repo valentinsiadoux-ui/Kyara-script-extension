@@ -944,7 +944,7 @@
       const result = await script.preview(contextFor(script.id, s), s.values);
       if (controller.signal.aborted) return;
       s.preview = result;
-      s.excluded = new Set();
+      s.excluded = new Set(result.excluded ?? []); // lignes décochées d'office (ex. cartes rares)
       s.phase = "preview";
     } catch (e) {
       if (controller.signal.aborted) return;
