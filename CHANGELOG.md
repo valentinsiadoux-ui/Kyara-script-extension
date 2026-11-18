@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+- Le bouton **←** est présent à toutes les étapes : depuis les réglages ou pendant une exécution, il ramène à la liste
+  des scripts (un script lancé continue en arrière-plan).
+
 ## 2.1.0
 - Bouton **←** (et Alt + ←) pour revenir à l'étape précédente : Aperçu → Réglages, Terminé → aperçu relu.
 - Les lignes décochées le restent quand on revient à l'aperçu ou qu'on le relance.

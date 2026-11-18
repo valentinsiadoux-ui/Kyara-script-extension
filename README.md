@@ -11,8 +11,10 @@ par rubrique (Marché, Échanges, Comptoir, Collection, Suivi). Chaque script ou
 3. **Exécution** : statut et journal en direct, **Arrêter**, **Copier le journal**. « Masquer » laisse tourner le script
    en arrière-plan.
 
-Le bouton **←** en haut à gauche du popover (ou **Alt + ←**) revient à l'étape précédente : de l'aperçu aux réglages,
-et d'une exécution terminée à un **aperçu relu** (ce qui vient d'être publié n'y figure plus). Les lignes décochées
+Le bouton **←** en haut à gauche du popover (ou **Alt + ←**) est présent à chaque étape et revient à la précédente :
+des réglages à la liste des scripts, de l'aperçu aux réglages, d'une exécution terminée à un **aperçu relu** (ce qui
+vient d'être publié n'y figure plus). Pendant une exécution, il revient à la liste des scripts et le script continue
+en arrière-plan. Les lignes décochées
 restent décochées d'un aperçu à l'autre.
 
 Sur le bouton et dans le menu, un point indique l'état : **vert clignotant** = en cours, **rouge** = terminé avec une

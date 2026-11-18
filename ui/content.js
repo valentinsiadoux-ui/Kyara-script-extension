@@ -359,7 +359,7 @@
   pop.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft" && e.altKey) {
       e.preventDefault();
-      backOf(scriptOf(current), sessions.get(current))?.run();
+      backOf(scriptOf(current), sessions.get(current)).run();
     } else if (e.key === "Escape") {
       e.stopPropagation();
       close();
@@ -387,7 +387,8 @@
   });
 
   // ---------- Rendu ----------
-  // Étape précédente : Aperçu (ou son chargement) -> Réglages ; Terminé -> nouvel aperçu, mêmes lignes cochées.
+  // Étape précédente, à chaque étape : Réglages / Exécution -> liste des scripts ; Aperçu (ou son chargement) -> Réglages ;
+  // Terminé -> nouvel aperçu, mêmes lignes cochées.
   function backOf(script, s) {
     if (s.phase === "loading")
       return {
@@ -416,7 +417,14 @@
       };
     // L'aperçu est relu : ce qui vient d'être publié n'y figure plus, rien n'est relancé deux fois.
     if (s.phase === "done") return { label: "Aperçu (relu)", run: () => startPreview(script, s) };
-    return null;
+    // Réglages ou exécution en cours : retour à la liste des scripts ; un script lancé continue en arrière-plan.
+    return {
+      label: s.phase === "running" ? "Liste des scripts (le script continue)" : "Liste des scripts",
+      run: () => {
+        close();
+        toggleMenu(true);
+      },
+    };
   }
 
   function render() {
@@ -438,19 +446,17 @@
       h(
         "div",
         { class: "hd" },
-        back
-          ? h(
-              "button",
-              {
-                class: "back",
-                type: "button",
-                "aria-label": `Retour : ${back.label}`,
-                title: `Retour : ${back.label} (Alt + ←)`,
-                onClick: back.run,
-              },
-              "←",
-            )
-          : null,
+        h(
+          "button",
+          {
+            class: "back",
+            type: "button",
+            "aria-label": `Retour : ${back.label}`,
+            title: `Retour : ${back.label} (Alt + ←)`,
+            onClick: back.run,
+          },
+          "←",
+        ),
         h("span", { class: "ic", "aria-hidden": "true" }, script.icon),
         h("div", {}, h("h2", { id: "kx-title" }, script.name), h("p", {}, script.description)),
         h("span", { class: "step" }, script.skipPreview ? { params: "Réglages", running: "Exécution", done: "Terminé" }[s.phase] : STEP_LABELS[s.phase]),
