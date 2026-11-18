@@ -11,10 +11,7 @@
   const K = globalThis.KyaraExt;
   const { LABELS, fmt } = K;
 
-  // Pastilles utilisées par les joueurs du comptoir, de la plus commune à la plus rare.
-  const DOTS = { C: "⚪", U: "🟢", R: "🔵", E: "🟣", L: "🟡", M: "🔴" };
-  const ORDER = ["C", "U", "R", "E", "L", "M"];
-  const dots = (set) => ORDER.filter((r) => set.includes(r)).map((r) => DOTS[r]).join("");
+  const dots = (set) => K.RARITIES_ASC.filter((r) => set.includes(r)).map((r) => K.DOTS[r]).join("");
   const KINDS = [
     ["vendre", "💰 Je vends"],
     ["acheter", "🛒 J'achète"],
@@ -30,14 +27,9 @@
   };
   const normalize = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-  function duplicates(collection, catalog, rarities) {
-    let n = 0;
-    for (const e of collection) {
-      const card = catalog.get(e.characterId);
-      if (card && rarities.includes(card.rarity)) n += Math.max(0, e.qty - 1);
-    }
-    return n;
-  }
+  // Même règle que la vente : hors épinglées, exemplaires à garder déduits.
+  const duplicates = (collection, catalog, p) =>
+    K.spares(collection, catalog, { keepCopies: p.keepCopies, rarities: p.giveRarities }).reduce((n, x) => n + x.n, 0);
 
   function findCards(names, catalog) {
     const byName = new Map([...catalog.values()].map((c) => [normalize(c.name), c]));
@@ -84,8 +76,12 @@
       },
       {
         key: "showCount", label: "Indiquer le nombre de doublons", type: "boolean", default: true,
-        help: "Compté dans ta collection pour les raretés choisies, arrondi (+4 000).",
+        help: "Doublons vendables de ta collection pour les raretés choisies (hors épinglées), arrondi (+4 000).",
         enabledWhen: { kind: ["vendre", "echanger"] },
+      },
+      {
+        key: "keepCopies", label: "Exemplaires gardés (non comptés)", type: "number", default: 1, min: 0, max: 50,
+        enabledWhen: { kind: ["vendre", "echanger"], showCount: true }, group: "advanced",
       },
       {
         key: "cards", label: "Cartes cherchées (séparées par des virgules)", type: "text", default: "",
@@ -105,18 +101,17 @@
     async preview(ctx, p) {
       ctx.status("Lecture du statut du comptoir…");
       const needsCatalog = p.kind === "chercher" || (p.showCount && ["vendre", "echanger"].includes(p.kind));
-      const [status, characters, collection] = await Promise.all([
+      const [status, catalog, collection] = await Promise.all([
         ctx.api("/me/chat"),
-        needsCatalog ? ctx.api("/characters") : null,
+        needsCatalog ? ctx.catalog() : new Map(),
         needsCatalog && p.kind !== "chercher" ? ctx.api("/me/collection?lean=1") : null,
       ]);
-      const catalog = new Map((characters ?? []).map((c) => [c.id, c]));
       const blocking = [], notes = [];
 
       if (["vendre", "echanger"].includes(p.kind) && !p.giveRarities.length) blocking.push("Choisis au moins une rareté de doublons.");
       if (["acheter", "echanger"].includes(p.kind) && !p.wantRarities.length) blocking.push("Choisis au moins une rareté recherchée.");
 
-      const dupes = collection ? duplicates(collection, catalog, p.giveRarities) : 0;
+      const dupes = collection ? duplicates(collection, catalog, p) : 0;
       let cards = [];
       if (p.kind === "chercher") {
         const { found, unknown } = findCards(p.cards.split(",").map((s) => s.trim()).filter(Boolean), catalog);

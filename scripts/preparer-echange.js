@@ -2,11 +2,9 @@
 (() => {
   const K = globalThis.KyaraExt;
   const labels = ["Tu donnes", "Tu reçois"];
-  const idOf = (el) =>
-    el
-      .querySelector("img")
-      ?.getAttribute("src")
-      ?.match(/\/(\d+)\.[a-z0-9]+(?:[?#]|$)/i)?.[1];
+  const MAX_CARDS = 20; // limite du site par côté
+  const imgId = (img) => img?.getAttribute("src")?.match(/\/(\d+)\.[a-z0-9]+(?:[?#]|$)/i)?.[1];
+  const idOf = (el) => imgId(el.querySelector("img"));
   const parseAmount = (text) => {
     const match = String(text)
       .replace(/\s/g, "")
@@ -52,9 +50,7 @@
     if (trays.some((t) => Number(t.querySelector(".ch input")?.value || 0) !== 0))
       throw new Error("Compléter : retire le chakra du formulaire, seules les cartes sont prises en compte.");
     const ids = trays.map((t) =>
-      [...t.querySelectorAll("img")]
-        .map((img) => img.getAttribute("src")?.match(/\/(\d+)\.[a-z0-9]+(?:[?#]|$)/i)?.[1])
-        .filter(Boolean),
+      [...t.querySelectorAll("img")].map(imgId).filter(Boolean),
     );
     const totals = [0, 0];
     for (const side of [0, 1]) {
@@ -137,7 +133,9 @@
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const raritiesOf = (p, side) => (side ? p.receiveRarities : p.giveRarities);
+  // Raretés cochées du côté, limitées par la rareté max commune.
+  const raritiesOf = (p, side) =>
+    (side ? p.receiveRarities : p.giveRarities).filter((r) => K.atMost(r, p.maxRarity));
   function checkRarities(p, side) {
     const rarities = raritiesOf(p, side);
     if (
@@ -146,7 +144,7 @@
       rarities.some((r) => !K.RARITIES.includes(r))
     )
       throw new Error(
-        `Coche au moins une rareté ${side ? "à récupérer" : "à donner"}.`,
+        `Coche au moins une rareté ${side ? "à récupérer" : "à donner"} sous la rareté max.`,
       );
   }
   function validate(p) {
@@ -200,11 +198,11 @@
       if (!partner) continue;
       plan[0].push(card);
       plan[1].push(partner);
-      if (plan[0].length === 20) break;
+      if (plan[0].length === MAX_CARDS) break;
     }
     return plan;
   }
-  function nearTarget(sorted, target, limit = 20) {
+  function nearTarget(sorted, target, limit = MAX_CARDS) {
     let chosen = [],
       total = 0;
     for (const card of sorted) {
@@ -256,7 +254,7 @@
     for (const cards of sorted) {
       for (const order of [cards, cards.slice().reverse()]) {
         let total = 0;
-        for (const card of order.slice(0, 20)) {
+        for (const card of order.slice(0, MAX_CARDS)) {
           total += card.value;
           targets.add(total);
         }
@@ -276,7 +274,7 @@
         bestGap = gap;
       }
     };
-    consider(pools.map((cards) => cards.slice(0, 20)));
+    consider(pools.map((cards) => cards.slice(0, MAX_CARDS)));
     for (const target of targets) {
       ctx.checkStopped();
       const left = nearTarget(sorted[0], target),
@@ -334,6 +332,13 @@
         label: "Raretés à récupérer",
         type: "raritySet",
         default: [...K.RARITIES],
+      },
+      {
+        key: "maxRarity",
+        label: "Rareté max (les deux côtés)",
+        type: "rarityMax",
+        default: "M",
+        help: "Aucune carte plus rare n'est ajoutée, même si sa rareté est cochée ci-dessus.",
       },
       {
         key: "buyPercent",
@@ -495,7 +500,7 @@
       }
       guard(ctx, form);
       ctx.status("Choix des cartes…");
-      let plan = pools.map((cards) => cards.slice(0, 20));
+      let plan = pools.map((cards) => cards.slice(0, MAX_CARDS));
       if (complete) {
         const before = await trayState(ctx, form);
         if (before.ids.some((list, side) => list.join() !== existing.ids[side].join()))
@@ -503,7 +508,7 @@
         const { totals } = existing;
         const other = 1 - fill;
         const sorted = pools[fill].filter((c) => c.value > 0).sort((a, b) => b.value - a.value);
-        const chosen = nearTarget(sorted, totals[other] - totals[fill], 20 - existing.ids[fill].length);
+        const chosen = nearTarget(sorted, totals[other] - totals[fill], MAX_CARDS - existing.ids[fill].length);
         const after = totals[fill] + sum(chosen);
         plan = [[], []];
         if (!chosen.length || !close(after, totals[other], p.completeGapPercent)) {
@@ -568,12 +573,7 @@
             ctx,
             form,
             () =>
-              [...parts(form).trays[side].querySelectorAll("img")].some(
-                (img) =>
-                  img
-                    .getAttribute("src")
-                    ?.match(/\/(\d+)\.[a-z0-9]+(?:[?#]|$)/i)?.[1] === card.id,
-              ),
+              [...parts(form).trays[side].querySelectorAll("img")].some((img) => imgId(img) === card.id),
             `L'ajout de ${card.name} n'a pas été confirmé. Préparation arrêtée.`,
           );
           counts[side]++;
