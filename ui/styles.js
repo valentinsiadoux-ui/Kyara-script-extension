@@ -147,7 +147,7 @@ KyaraExt.styles = `
 .field small { font-size: 11px; color: var(--mut); opacity: .85; }
 .field.check { flex-direction: row; align-items: flex-start; gap: 8px; }
 .field.check > span { color: var(--fg); font-size: 13px; }
-input[type=number], input[type=text], select {
+input[type=number], input[type=text], .album-filters input[type=search], select {
   all: unset; box-sizing: border-box; width: 100%;
   padding: 6px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg2); color: var(--fg); font-size: 13px;
 }
@@ -203,6 +203,26 @@ textarea:focus-visible { border-color: var(--acc); }
 .rar-button:hover { border-color: var(--rc); }
 .rar-button:focus-visible, .mode-option:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
 .rar-caption { color: var(--mut); font-size: 11px; line-height: 1.5; }
+
+/* Albums */
+.album-filters.field { gap: 10px; }
+.album-filters input[type=search] { min-height: 36px; }
+.album-filters input[type=search]:focus-visible { border-color: var(--acc); }
+.album-filters input[type=search]::placeholder { color: var(--mut); }
+.album-count { font-size: 12px; color: var(--mut); margin: 12px 0 8px; }
+.album-list { display: grid; gap: 8px; }
+.album-card { margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.album-card > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 10px 12px; margin: 0; }
+.album-card > summary:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; border-radius: 10px; }
+.album-title { font-weight: 650; color: var(--fg); overflow-wrap: anywhere; }
+.album-title::before { content: "▸"; margin-right: 6px; color: var(--acc); }
+.album-card[open] .album-title::before { content: "▾"; }
+.album-missing { color: var(--fg); }
+.album-card progress { width: 100%; height: 8px; align-self: center; accent-color: var(--acc); }
+.album-owned { justify-self: end; }
+.album-cards { margin: 0; padding: 4px 12px 10px; list-style: none; }
+.album-cards li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; }
+.album-cards small { margin-left: auto; color: var(--mut); }
 
 /* Aperçu */
 .summary { margin: 0 0 10px; }

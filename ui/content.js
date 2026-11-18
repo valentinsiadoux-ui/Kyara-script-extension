@@ -323,6 +323,8 @@
     position();
     updateBar();
     pop.querySelector("input, select, .btn.primary")?.focus();
+    if (id === "albums-a-remplir" && sessions.get(id).phase === "params")
+      startPreview(scriptOf(id), sessions.get(id));
   }
   function close() {
     const s = sessions.get(current);
@@ -390,6 +392,14 @@
   // Étape précédente, à chaque étape : Réglages / Exécution -> liste des scripts ; Aperçu (ou son chargement) -> Réglages ;
   // Terminé -> nouvel aperçu, mêmes lignes cochées.
   function backOf(script, s) {
+    if (script.id === "albums-a-remplir")
+      return {
+        label: "Liste des scripts",
+        run: () => {
+          close();
+          toggleMenu(true);
+        },
+      };
     if (s.phase === "loading")
       return {
         label: "Réglages",
@@ -973,7 +983,55 @@
     return m ? Number(m[0].replace(",", ".")) : null;
   };
 
+  function viewAlbums(script, s) {
+    const rarity = script.params[0];
+    const picker = rarityMax(rarity, s.values.maxRarity);
+    const limit = picker.querySelector("input");
+    const search = h("input", { type: "search", placeholder: "Chercher un album…" , "aria-label": "Chercher un album" });
+    const count = h("p", { class: "album-count", role: "status" });
+    const list = h("div", { class: "album-list" });
+    const refresh = () => {
+      const query = search.value.trim().toLocaleLowerCase("fr");
+      const albums = s.preview.albums.filter(a => a.name.toLocaleLowerCase("fr").includes(query) &&
+        (limit.value === "M" || a.missing.every(c => K.rank(c.rarity) >= K.rank(limit.value))));
+      count.textContent = albums.length ? albums.length + " album(s) à remplir" : "Aucun album avec ces filtres.";
+      list.replaceChildren(...albums.map(a => {
+        const owned = a.total - a.missing.length;
+        const cards = h("ul", { class: "album-cards" });
+        const row = h("details", { class: "album-card" },
+          h("summary", {},
+            h("span", { class: "album-title" }, a.name),
+            h("span", { class: "album-missing" }, a.missing.length + " à trouver"),
+            h("progress", { value: owned, max: a.total, "aria-label": "Cartes possédées" }),
+            h("span", { class: "album-owned" }, owned + " / " + a.total)),
+          cards);
+        row.addEventListener("toggle", () => {
+          if (!row.open || cards.childElementCount) return;
+          cards.append(...a.missing.map(c => h("li", {},
+            h("span", { class: "rdot", style: "--rc:" + K.COLORS[c.rarity], title: K.LABELS[c.rarity] }),
+            c.name, h("small", {}, K.LABELS[c.rarity]))));
+        });
+        return row;
+      }));
+    };
+    search.addEventListener("input", refresh);
+    limit.addEventListener("change", () => {
+      s.values.maxRarity = limit.value;
+      saveValues(script, s.values);
+      refresh();
+    });
+    refresh();
+    return {
+      body: h("div", { class: "bd" }, h("div", { class: "album-filters field" }, search, picker), count, list),
+      footer: [
+        h("button", { type: "button", class: "btn", onClick: () => startPreview(script, s) }, "Actualiser"),
+        h("button", { type: "button", class: "btn primary", onClick: backOf(script, s).run }, "Retour au menu"),
+      ],
+    };
+  }
+
   function viewPreview(script, s) {
+    if (s.preview.albums) return viewAlbums(script, s);
     const pv = s.preview;
     const selectable = pv.rows.filter((r) => r.selectable);
     const included = (r) => r.selectable && !s.excluded.has(r.id);
