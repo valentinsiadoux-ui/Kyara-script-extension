@@ -81,6 +81,11 @@ KyaraExt.styles = `
   animation: kx-pulse 1.4s ease-in-out infinite;
 }
 .trigger .dot { top: 0; right: 2px; }
+.dot.err { background: #ff6b6b; animation: none; }
+.dot.ok { background: #4ad991; animation: none; }
+.trigger.mini { padding-right: 6px; }
+.trigger.mini .lbl, .trigger.mini .chev { display: none; }
+.menu .collapse small { white-space: normal; }
 @keyframes kx-pulse { 50% { opacity: .35; } }
 @media (max-width: 640px) { .trigger .lbl { display: none; } .trigger { padding-right: 10px; } }
 
@@ -155,20 +160,15 @@ input:invalid { border-color: var(--err); }
 input[type=checkbox] { accent-color: var(--acc); width: 15px; height: 15px; margin: 2px 0 0; flex: none; }
 .rmap { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
 .rmap label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: var(--mut); }
+.rmap .rar-glyph { color: var(--rc); font-weight: 800; font-size: 12px; }
 .rmap input { text-align: center; padding: 5px 2px; }
 details { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
 summary { cursor: pointer; color: var(--mut); font-size: 12px; margin-bottom: 10px; }
 
-/* Sélecteurs de préparation, inspirés de Kyara. */
-.purchase-price, .balance-settings { grid-column: 1 / -1; }
-.purchase-price input { width: 100%; box-sizing: border-box; }
-.balance-settings { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.balance-settings:has(> [data-param="balance"][hidden]) { display: none; }
-.balance-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
-.balance-fields:has(> [data-param="maxGapPercent"]:not([hidden])) { grid-template-columns: minmax(0, 1fr) 100px; }
-.balance-fields:has(> [data-param="balanceMode"][hidden]) { display: none; }
-.balance-fields > .field { min-width: 0; }
-.balance-fields select, .balance-fields input { width: 100%; min-width: 0; box-sizing: border-box; }
+/* Champs regroupés sur une ligne (param.row) ; ligne masquée si tous ses champs le sont. */
+.row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; align-items: start; min-width: 0; }
+.row:not(:has(> .field:not([hidden]))) { display: none; }
+.row > .field { min-width: 0; }
 .field[hidden] { display: none !important; }
 .field.inactive { opacity: .45; }
 .field.inactive select, .field.inactive input { cursor: not-allowed; }
@@ -217,6 +217,14 @@ td.sel, th.sel { width: 28px; }
 td.sel + td { min-width: 150px; }
 .note { display: block; color: var(--warn); font-size: 11px; text-decoration: none; }
 .count { color: var(--mut); font-size: 12px; align-self: center; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--fg); }
+th[aria-sort="ascending"]::after { content: " ▲"; font-size: 9px; }
+th[aria-sort="descending"]::after { content: " ▼"; font-size: 9px; }
+tfoot td { position: sticky; bottom: 0; background: var(--bg2); font-weight: 600; border-top: 1px solid var(--line); border-bottom: 0; }
+.rdot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--rc); vertical-align: 1px; }
+.presets { display: flex; align-items: center; gap: 4px; }
+.presets select { width: auto; max-width: 170px; padding-top: 5px; padding-bottom: 5px; font-size: 12px; }
 
 /* Chargement / exécution */
 .loading { display: flex; align-items: center; gap: 10px; padding: 18px 2px; color: var(--mut); }

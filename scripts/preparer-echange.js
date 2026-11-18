@@ -307,6 +307,7 @@
     description:
       "Prépare des doubles manquants avec raretés communes, équilibrage, achat, vente en chakra ou complément d'un échange commencé. Envoi manuel.",
     skipPreview: true,
+    runLabel: "Préparer l’échange",
     params: [
       {
         key: "mode",
@@ -355,6 +356,8 @@
       {
         key: "balanceMode",
         enabledWhen: { mode: "trade", balance: true },
+        inactiveWhen: { mode: "trade" },
+        row: "balance",
         label: "Mode d'équilibrage",
         type: "select",
         default: "rarity",
@@ -373,6 +376,8 @@
         max: 100,
         step: 0.1,
         enabledWhen: { mode: "trade", balance: true, balanceMode: "value" },
+        inactiveWhen: { mode: "trade", balanceMode: "value" },
+        row: "balance",
         title:
           "Écart calculé par rapport au plus petit total. 0 % impose des totaux identiques.",
       },

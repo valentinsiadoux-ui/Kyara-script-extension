@@ -8,7 +8,7 @@
     return;
 
   const MAX_LOGS = 500;
-  const CATEGORIES = ["Marché", "Échanges", "Comptoir"];
+  const CATEGORIES = ["Marché", "Échanges", "Comptoir", "Collection", "Suivi"];
   const STEP_LABELS = {
     params: "1 · Réglages",
     loading: "2 · Aperçu",
@@ -40,7 +40,17 @@
   async function loadValues(script) {
     try {
       const key = `params:${script.id}`;
-      const saved = (await storage?.get(key))?.[key] ?? {};
+      let saved = (await storage?.get(key))?.[key];
+      // Réglages d'un ancien script fusionné dans celui-ci : repris une fois.
+      for (const [oldId, map] of Object.entries(script.legacy ?? {})) {
+        if (saved) break;
+        const oldKey = `params:${oldId}`;
+        const old = (await storage?.get(oldKey))?.[oldKey];
+        if (old) {
+          saved = map(old);
+          storage?.set({ [key]: saved });
+        }
+      }
       return { ...defaultsOf(script), ...saved };
     } catch {
       return defaultsOf(script);
@@ -51,6 +61,36 @@
       storage?.set({ [`params:${script.id}`]: values });
     } catch {
       /* stockage indisponible : réglages non mémorisés */
+    }
+  }
+  async function loadPresets(script) {
+    try {
+      const key = `presets:${script.id}`;
+      return (await storage?.get(key))?.[key] ?? {};
+    } catch {
+      return {};
+    }
+  }
+  function savePresets(script, presets) {
+    try {
+      storage?.set({ [`presets:${script.id}`]: presets });
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+  // Préférences du menu : position verticale, bouton réduit.
+  async function loadUi() {
+    try {
+      return (await storage?.get("ui"))?.ui ?? {};
+    } catch {
+      return {};
+    }
+  }
+  function saveUi(ui) {
+    try {
+      storage?.set({ ui });
+    } catch {
+      /* stockage indisponible */
     }
   }
 
@@ -68,12 +108,17 @@
         logs: [],
         statusText: "",
         error: null,
+        // Fin du dernier lancement : "done" | "error", affichée sur le menu tant qu'elle n'a pas été vue.
+        outcome: null,
+        seen: true,
+        presets: {},
+        preset: "",
       },
     ]),
   );
   for (const s of K.scripts)
-    loadValues(s).then((v) => {
-      sessions.get(s.id).values = v;
+    Promise.all([loadValues(s), loadPresets(s)]).then(([v, presets]) => {
+      Object.assign(sessions.get(s.id), { values: v, presets });
       if (current === s.id && sessions.get(s.id).phase === "params") render();
     });
   const scriptOf = (id) => K.scripts.find((s) => s.id === id);
@@ -90,8 +135,32 @@
       "aria-haspopup": "menu",
       "aria-expanded": "false",
       "aria-controls": "kx-menu",
-      title: "Scripts Kyara",
-      onClick: () => toggleMenu(),
+      title: "Scripts Kyara — glisser pour déplacer",
+      onClick: () => {
+        // La fin d'un glisser n'ouvre pas le menu.
+        if (drag?.moved) return void (drag = null);
+        toggleMenu();
+      },
+      onPointerDown: (e) => {
+        if (e.button !== 0) return;
+        drag = { id: e.pointerId, y: e.clientY, top: barHost.getBoundingClientRect().top, moved: false };
+        trigger.setPointerCapture(e.pointerId);
+      },
+      onPointerMove: (e) => {
+        if (!drag || drag.id !== e.pointerId) return;
+        const dy = e.clientY - drag.y;
+        if (!drag.moved && Math.abs(dy) < 5) return;
+        drag.moved = true;
+        placeTop(drag.top + dy);
+        if (isOpen()) position();
+      },
+      onPointerUp: (e) => {
+        if (!drag || drag.id !== e.pointerId) return;
+        if (drag.moved) {
+          ui.top = parseFloat(barHost.style.top);
+          saveUi(ui);
+        } else drag = null;
+      },
     },
     h("span", { class: "logo", "aria-hidden": "true" }, "K"),
     h("span", { class: "lbl" }, "Scripts"),
@@ -140,6 +209,26 @@
           ),
         ),
       ),
+    h(
+      "div",
+      { class: "sec" },
+      h(
+        "button",
+        {
+          type: "button",
+          role: "menuitem",
+          class: "collapse",
+          onClick: () => {
+            ui.collapsed = !ui.collapsed;
+            saveUi(ui);
+            applyUi();
+            toggleMenu(false);
+          },
+        },
+        h("span", { class: "ic", "aria-hidden": "true" }, "⇲"),
+        h("span", { class: "txt" }, h("small", {}, "Réduire / agrandir le bouton")),
+      ),
+    ),
   );
   barRoot.append(
     h("style", {}, K.styles),
@@ -170,20 +259,49 @@
     }
   });
 
+  // Point vert : en cours ; rouge : erreur non vue ; coche : terminé, non vu.
+  function badgeOf(session) {
+    if (session.phase === "running") return ["run", "En cours"];
+    if (!session.seen && session.outcome === "error") return ["err", "Terminé avec une erreur"];
+    if (!session.seen && session.outcome === "done") return ["ok", "Terminé"];
+    return null;
+  }
   function updateBar() {
-    let any = false;
-    for (const btn of menu.querySelectorAll("button")) {
-      const running = sessions.get(btn.dataset.id).phase === "running";
-      any ||= running;
+    const badges = [];
+    for (const btn of menu.querySelectorAll("button[data-id]")) {
+      const badge = badgeOf(sessions.get(btn.dataset.id));
       btn.querySelector(".dot")?.remove();
-      if (running) btn.append(h("span", { class: "dot", title: "En cours" }));
+      if (badge) {
+        badges.push(badge[0]);
+        btn.append(h("span", { class: `dot ${badge[0]}`, title: badge[1] }));
+      }
     }
     trigger.querySelector(".dot")?.remove();
-    if (any)
+    const top = ["run", "err", "ok"].find((b) => badges.includes(b));
+    if (top)
       trigger.append(
-        h("span", { class: "dot", title: "Un script est en cours" }),
+        h("span", {
+          class: `dot ${top}`,
+          title: { run: "Un script est en cours", err: "Un script a rencontré une erreur", ok: "Un script a terminé" }[top],
+        }),
       );
   }
+
+  // ---------- Position du bouton ----------
+  let drag = null;
+  let ui = {};
+  function placeTop(top) {
+    barHost.style.top = `${Math.round(Math.min(Math.max(8, top), innerHeight - 44))}px`;
+  }
+  function applyUi() {
+    if (typeof ui.top === "number") placeTop(ui.top);
+    trigger.classList.toggle("mini", !!ui.collapsed);
+  }
+  loadUi().then((saved) => {
+    ui = saved;
+    applyUi();
+  });
+  addEventListener("resize", () => typeof ui.top === "number" && placeTop(ui.top));
 
   let scheduled = false;
   // Le site (SvelteKit) peut réécrire le body : on se remet en place si on a été retiré.
@@ -209,6 +327,7 @@
   const isOpen = () => pop.classList.contains("open");
   function open(id) {
     current = id;
+    sessions.get(id).seen = true;
     if (!popHost.isConnected) document.body.append(popHost);
     render();
     if (!isOpen()) {
@@ -314,7 +433,7 @@
           "span",
           { class: "step" },
           script.skipPreview
-            ? { params: "Réglages", running: "Préparation", done: "Terminé" }[
+            ? { params: "Réglages", running: "Exécution", done: "Terminé" }[
                 s.phase
               ]
             : STEP_LABELS[s.phase],
@@ -338,6 +457,168 @@
     if (current === id && isOpen()) render();
     updateBar();
   };
+
+  // Bouton coloré d'une rareté (sélecteurs de raretés).
+  const rarButton = (r, props = {}) =>
+    h(
+      "button",
+      {
+        type: "button",
+        class: "rar-button",
+        title: K.LABELS[r],
+        "aria-label": K.LABELS[r],
+        style: `--rc:${K.COLORS[r]}`,
+        ...props,
+      },
+      h("span", { class: "rar-glyph", "aria-hidden": "true" }, r),
+    );
+
+  // Plusieurs raretés : clic ou glisser sur une plage, bouton Toutes.
+  function raritySet(p, value) {
+    const order = K.RARITIES_ASC;
+    const inputs = Object.fromEntries(
+      order.map((r) => [
+        r,
+        h("input", {
+          type: "checkbox",
+          name: `${p.key}.${r}`,
+          checked: (value ?? []).includes(r),
+          hidden: true,
+        }),
+      ]),
+    );
+    const caption = h("span", { class: "rar-caption", "aria-live": "polite" });
+    const notify = () => {
+      refresh();
+      inputs.C.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const refresh = () => {
+      const selected = order.filter((r) => inputs[r].checked);
+      all.setAttribute("aria-pressed", String(selected.length === order.length));
+      buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(inputs[order[i]].checked)));
+      caption.textContent =
+        selected.length === order.length
+          ? "Toutes"
+          : selected.length
+            ? selected.map((r) => K.LABELS[r]).join(" · ")
+            : "Aucune";
+    };
+    const all = h(
+      "button",
+      {
+        type: "button",
+        class: "rar-button all",
+        title: "Toutes les raretés",
+        onClick: () => {
+          const checked = !order.every((r) => inputs[r].checked);
+          order.forEach((r) => (inputs[r].checked = checked));
+          notify();
+        },
+      },
+      h("span", { class: "rar-glyph", "aria-hidden": "true" }, "✦"),
+      "Toutes",
+    );
+    let drag = null;
+    const applyRange = (index) => {
+      const low = Math.min(drag.start, index),
+        high = Math.max(drag.start, index);
+      order.forEach((r, i) => {
+        inputs[r].checked = i >= low && i <= high ? drag.checked : drag.initial[i];
+      });
+      notify();
+    };
+    const buttons = order.map((r, index) =>
+      rarButton(r, {
+        onPointerDown: (e) => {
+          if (e.button !== 0 || e.isPrimary === false) return;
+          drag = {
+            id: e.pointerId,
+            start: index,
+            checked: !inputs[r].checked,
+            initial: order.map((r) => inputs[r].checked),
+          };
+          bar.setPointerCapture(e.pointerId);
+          applyRange(index);
+        },
+        onClick: (e) => {
+          // Les clics souris/tactiles ont déjà été traités par pointerdown.
+          if (e?.detail > 0) return;
+          inputs[r].checked = !inputs[r].checked;
+          notify();
+        },
+      }),
+    );
+    const finish = (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      drag = null;
+      if (bar.hasPointerCapture(e.pointerId)) bar.releasePointerCapture(e.pointerId);
+    };
+    const bar = h(
+      "div",
+      {
+        class: "rar-bar",
+        role: "group",
+        "aria-label": "Raretés — cliquer ou glisser pour sélectionner",
+        onPointerMove: (e) => {
+          if (!drag || drag.id !== e.pointerId) return;
+          const index = buttons.findIndex((b) => {
+            const rect = b.getBoundingClientRect();
+            return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+          });
+          if (index >= 0) applyRange(index);
+        },
+        onPointerUp: finish,
+        onPointerCancel: (e) => {
+          if (!drag || drag.id !== e.pointerId) return;
+          order.forEach((r, i) => (inputs[r].checked = drag.initial[i]));
+          notify();
+          finish(e);
+        },
+        onLostPointerCapture: () => {
+          drag = null;
+        },
+      },
+      all,
+      buttons,
+    );
+    refresh();
+    return h("div", { class: "rar-sheet" }, Object.values(inputs), bar, caption);
+  }
+
+  // Rareté maximale : un clic choisit la plus haute rareté admise, toutes celles en dessous suivent.
+  function rarityMax(p, value) {
+    const order = K.RARITIES_ASC;
+    const input = h("input", {
+      type: "hidden",
+      name: p.key,
+      value: order.includes(value) ? value : p.default,
+    });
+    const caption = h("span", { class: "rar-caption", "aria-live": "polite" });
+    const refresh = () => {
+      const max = order.indexOf(input.value);
+      buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(i <= max)));
+      caption.textContent =
+        input.value === "M" ? "Toutes les raretés" : `Jusqu'à ${K.LABELS[input.value]} (${order.slice(0, max + 1).join(" ")})`;
+    };
+    const buttons = order.map((r) =>
+      rarButton(r, {
+        title: `Jusqu'à ${K.LABELS[r]}`,
+        onClick: () => {
+          input.value = r;
+          refresh();
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+      }),
+    );
+    refresh();
+    return h(
+      "div",
+      { class: "rar-sheet" },
+      input,
+      h("div", { class: "rar-bar max", role: "group", "aria-label": p.label }, buttons),
+      caption,
+    );
+  }
 
   // 1. Réglages
   function field(p, value) {
@@ -418,166 +699,18 @@
         ),
       );
     } else if (p.type === "raritySet") {
-      const colors = {
-        C: "#B5B1BB",
-        U: "#3FBF7F",
-        R: "#4D9BFF",
-        E: "#B072FF",
-        L: "#F5C518",
-        M: "#FF4D2E",
-      };
-      const order = ["C", "U", "R", "E", "L", "M"];
-      const inputs = Object.fromEntries(
-        order.map((r) => [
-          r,
-          h("input", {
-            type: "checkbox",
-            name: p.key + "." + r,
-            checked: (value ?? []).includes(r),
-            hidden: true,
-          }),
-        ]),
-      );
-      const caption = h("span", {
-        class: "rar-caption",
-        "aria-live": "polite",
-      });
-      const refresh = () => {
-        const selected = order.filter((r) => inputs[r].checked);
-        all.setAttribute(
-          "aria-pressed",
-          String(selected.length === order.length),
-        );
-        buttons.forEach((b, i) =>
-          b.setAttribute("aria-pressed", String(inputs[order[i]].checked)),
-        );
-        caption.textContent =
-          selected.length === order.length
-            ? "Toutes"
-            : selected.length
-              ? selected.map((r) => K.LABELS[r]).join(" · ")
-              : "Aucune";
-      };
-      const all = h(
-        "button",
-        {
-          type: "button",
-          class: "rar-button all",
-          title: "Toutes les raretés",
-          onClick: () => {
-            const checked = !order.every((r) => inputs[r].checked);
-            order.forEach((r) => {
-              inputs[r].checked = checked;
-            });
-            refresh();
-            inputs.C.dispatchEvent(new Event("change", { bubbles: true }));
-          },
-        },
-        h("span", { class: "rar-glyph", "aria-hidden": "true" }, "✦"),
-        "Toutes",
-      );
-      let drag = null;
-      const notify = () => {
-        refresh();
-        inputs.C.dispatchEvent(new Event("change", { bubbles: true }));
-      };
-      const applyRange = (index) => {
-        const low = Math.min(drag.start, index),
-          high = Math.max(drag.start, index);
-        order.forEach((r, i) => {
-          inputs[r].checked =
-            i >= low && i <= high ? drag.checked : drag.initial[i];
-        });
-        notify();
-      };
-      const buttons = order.map((r, index) =>
-        h(
-          "button",
-          {
-            type: "button",
-            class: "rar-button",
-            title: K.LABELS[r],
-            "aria-label": K.LABELS[r],
-            style: "--rc:" + colors[r],
-            onPointerDown: (e) => {
-              if (e.button !== 0 || e.isPrimary === false) return;
-              drag = {
-                id: e.pointerId,
-                start: index,
-                checked: !inputs[r].checked,
-                initial: order.map((r) => inputs[r].checked),
-              };
-              bar.setPointerCapture(e.pointerId);
-              applyRange(index);
-            },
-            onClick: (e) => {
-              // Les clics souris/tactiles ont déjà été traités par pointerdown.
-              if (e?.detail > 0) return;
-              inputs[r].checked = !inputs[r].checked;
-              notify();
-            },
-          },
-          h("span", { class: "rar-glyph", "aria-hidden": "true" }, r),
-        ),
-      );
-      const finish = (e) => {
-        if (!drag || drag.id !== e.pointerId) return;
-        drag = null;
-        if (bar.hasPointerCapture(e.pointerId))
-          bar.releasePointerCapture(e.pointerId);
-      };
-      const bar = h(
-        "div",
-        {
-          class: "rar-bar",
-          role: "group",
-          "aria-label": "Raretés — cliquer ou glisser pour sélectionner",
-          onPointerMove: (e) => {
-            if (!drag || drag.id !== e.pointerId) return;
-            const index = buttons.findIndex((b) => {
-              const rect = b.getBoundingClientRect();
-              return (
-                e.clientX >= rect.left &&
-                e.clientX <= rect.right &&
-                e.clientY >= rect.top &&
-                e.clientY <= rect.bottom
-              );
-            });
-            if (index >= 0) applyRange(index);
-          },
-          onPointerUp: finish,
-          onPointerCancel: (e) => {
-            if (!drag || drag.id !== e.pointerId) return;
-            order.forEach((r, i) => {
-              inputs[r].checked = drag.initial[i];
-            });
-            notify();
-            finish(e);
-          },
-          onLostPointerCapture: () => {
-            drag = null;
-          },
-        },
-        all,
-        buttons,
-      );
-      control = h(
-        "div",
-        { class: "rar-sheet" },
-        Object.values(inputs),
-        bar,
-        caption,
-      );
-      refresh();
+      control = raritySet(p, value);
+    } else if (p.type === "rarityMax") {
+      control = rarityMax(p, value);
     } else if (p.type === "rarityMap") {
       control = h(
         "div",
         { class: "rmap" },
-        K.RARITIES.map((r) =>
+        K.RARITIES_ASC.map((r) =>
           h(
             "label",
-            { title: K.LABELS[r] },
-            r,
+            { title: K.LABELS[r], style: `--rc:${K.COLORS[r]}` },
+            h("span", { class: "rar-glyph" }, r),
             h("input", {
               type: "number",
               name: `${p.key}.${r}`,
@@ -613,7 +746,7 @@
       });
     }
     return h(
-      ["raritySet", "modeToggle", "choice"].includes(p.type) ? "div" : "label",
+      ["raritySet", "rarityMax", "modeToggle", "choice"].includes(p.type) ? "div" : "label",
       { class: "field" },
       h("span", {}, p.label),
       control,
@@ -632,6 +765,8 @@
         values[p.key] = K.RARITIES.filter(
           (r) => form.elements[p.key + "." + r].checked,
         );
+      } else if (p.type === "rarityMax") {
+        values[p.key] = form.elements[p.key].value;
       } else if (p.type === "rarityMap") {
         values[p.key] = {};
         for (const r of K.RARITIES) {
@@ -643,39 +778,29 @@
     return values;
   }
 
+  const matches = (cond, values) =>
+    Object.entries(cond).every(([key, value]) =>
+      Array.isArray(value) ? value.includes(values[key]) : values[key] === value,
+    );
+
   function viewParams(script, s) {
     const renderField = (p) => {
       const node = field(p, s.values[p.key]);
       node.setAttribute("data-param", p.key);
       if (p.title) node.title = p.title;
-      if (script.id === "preparer-echange" && p.key === "buyPercent")
-        node.classList.add("purchase-price");
       return node;
     };
-    const renderFields = (params) =>
-      params.flatMap((p) => {
-        if (script.id !== "preparer-echange") return [renderField(p)];
-        if (["balanceMode", "maxGapPercent"].includes(p.key)) return [];
-        if (p.key === "balance") {
-          const mode = params.find((item) => item.key === "balanceMode");
-          const gap = params.find((item) => item.key === "maxGapPercent");
-          if (mode && gap)
-            return [
-              h(
-                "div",
-                { class: "balance-settings" },
-                renderField(p),
-                h(
-                  "div",
-                  { class: "balance-fields" },
-                  renderField(mode),
-                  renderField(gap),
-                ),
-              ),
-            ];
-        }
-        return [renderField(p)];
-      });
+    // Les champs consécutifs d'un même `row` partagent une ligne.
+    const renderFields = (params) => {
+      const out = [];
+      for (const p of params) {
+        const last = out.at(-1);
+        if (p.row && last?.dataset.row === p.row) last.append(renderField(p));
+        else if (p.row) out.push(h("div", { class: "row", "data-row": p.row }, renderField(p)));
+        else out.push(renderField(p));
+      }
+      return out;
+    };
     const basic = script.params.filter((p) => p.group !== "advanced");
     const advanced = script.params.filter((p) => p.group === "advanced");
     const form = h(
@@ -692,13 +817,7 @@
           else startPreview(script, s);
         },
       },
-      s.error
-        ? h(
-            "ul",
-            { class: "warn-list" },
-            h("li", {}, `L'aperçu a échoué : ${s.error}`),
-          )
-        : null,
+      s.error ? h("ul", { class: "warn-list" }, h("li", {}, `L'aperçu a échoué : ${s.error}`)) : null,
       h("div", { class: "grid" }, renderFields(basic)),
       advanced.length
         ? h(
@@ -712,21 +831,11 @@
     const syncEnabled = () => {
       const values = readForm(script, form);
       for (const p of script.params) {
-        const node = form.querySelector('[data-param="' + p.key + '"]');
-        const enabled =
-          !p.enabledWhen ||
-          Object.entries(p.enabledWhen).every(([key, value]) =>
-            Array.isArray(value)
-              ? value.includes(values[key])
-              : values[key] === value,
-          );
-        const showDisabled =
-          script.id === "preparer-echange" &&
-          values.mode === "trade" &&
-          (p.key === "balanceMode" ||
-            (p.key === "maxGapPercent" && values.balanceMode === "value"));
-        node.hidden = !enabled && !showDisabled;
-        node.classList.toggle("inactive", !enabled && showDisabled);
+        const node = form.querySelector(`[data-param="${p.key}"]`);
+        const enabled = !p.enabledWhen || matches(p.enabledWhen, values);
+        const inactive = !enabled && !!p.inactiveWhen && matches(p.inactiveWhen, values);
+        node.hidden = !enabled && !inactive;
+        node.classList.toggle("inactive", inactive);
         node.querySelectorAll("input, select, textarea, button").forEach((el) => {
           el.disabled = !enabled;
         });
@@ -734,31 +843,60 @@
     };
     form.addEventListener("change", syncEnabled);
     syncEnabled();
+
+    // Préréglages : valeurs enregistrées sous un nom, plus les valeurs par défaut.
+    const applyValues = (values, preset) => {
+      s.values = { ...defaultsOf(script), ...structuredClone(values) };
+      s.preset = preset;
+      saveValues(script, s.values);
+      render();
+    };
+    const presetSelect = h(
+      "select",
+      {
+        class: "preset",
+        "aria-label": "Préréglages",
+        onChange: (e) => {
+          const name = e.target.value;
+          if (name === "__defaults") applyValues(defaultsOf(script), "");
+          else if (name) applyValues(s.presets[name], name);
+        },
+      },
+      h("option", { value: "" }, "Préréglages…"),
+      h("option", { value: "__defaults" }, "Valeurs par défaut"),
+      Object.keys(s.presets).map((name) => h("option", { value: name, selected: name === s.preset }, name)),
+    );
+    const savePreset = () => {
+      if (!form.reportValidity()) return;
+      const name = prompt("Nom du préréglage :", s.preset || "")?.trim();
+      if (!name || name === "__defaults") return;
+      s.presets = { ...s.presets, [name]: readForm(script, form) };
+      savePresets(script, s.presets);
+      applyValues(s.presets[name], name);
+    };
+    const deletePreset = () => {
+      if (!s.preset || !confirm(`Supprimer le préréglage « ${s.preset} » ?`)) return;
+      const { [s.preset]: _, ...rest } = s.presets;
+      s.presets = rest;
+      s.preset = "";
+      savePresets(script, s.presets);
+      render();
+    };
     return {
       body: h("div", { class: "bd" }, form),
       footer: [
         h(
-          "button",
-          {
-            class: "btn link left",
-            type: "button",
-            onClick: () => {
-              s.values = defaultsOf(script);
-              saveValues(script, s.values);
-              render();
-            },
-          },
-          "Valeurs par défaut",
+          "div",
+          { class: "presets left" },
+          presetSelect,
+          h("button", { class: "btn link", type: "button", onClick: savePreset }, "Enregistrer"),
+          s.preset ? h("button", { class: "btn link", type: "button", onClick: deletePreset }, "Supprimer") : null,
         ),
-        h(
-          "button",
-          { class: "btn", type: "button", onClick: close },
-          "Annuler",
-        ),
+        h("button", { class: "btn", type: "button", onClick: close }, "Annuler"),
         h(
           "button",
           { class: "btn primary", type: "submit", form: "kx-form" },
-          script.skipPreview ? "Préparer l’échange" : "Voir l'aperçu →",
+          script.runLabel ?? (script.skipPreview ? "Lancer" : "Voir l'aperçu →"),
         ),
       ],
     };
@@ -853,90 +991,109 @@
     };
   }
 
+  // Valeur numérique d'une cellule (tri et totaux) : rows[].values, sinon le nombre affiché.
+  const numOf = (r, key) => {
+    const v = r.values?.[key] ?? r.cells[key];
+    if (typeof v === "number") return v;
+    const m = String(v ?? "").replace(/[\s\u202f\u00a0]/g, "").match(/^[+-]?\d+(?:[.,]\d+)?/);
+    return m ? Number(m[0].replace(",", ".")) : null;
+  };
+
   function viewPreview(script, s) {
     const pv = s.preview;
     const selectable = pv.rows.filter((r) => r.selectable);
-    const selectedCount = () =>
-      selectable.filter((r) => !s.excluded.has(r.id)).length;
+    const included = (r) => r.selectable && !s.excluded.has(r.id);
     const count = h("span", { class: "count left" });
     const confirmBtn = h(
       "button",
-      {
-        class: "btn primary",
-        type: "button",
-        onClick: () => startRun(script, s),
-      },
+      { class: "btn primary", type: "button", onClick: () => startRun(script, s) },
       "Confirmer et lancer",
     );
     const all = h("input", { type: "checkbox", "aria-label": "Tout cocher" });
+    const totals = pv.columns.some((c) => c.total)
+      ? pv.columns.map((c, i) => (c.total ? h("td", { class: "end" }) : h("td", {}, i === 0 ? "Total (cochées)" : "")))
+      : null;
     const sync = () => {
-      const n = selectedCount();
-      count.textContent = pv.rows.length
-        ? `${n}/${selectable.length} sélectionnée(s)`
-        : "";
+      const n = selectable.filter(included).length;
+      count.textContent = pv.rows.length ? `${n}/${selectable.length} sélectionnée(s)` : "";
       confirmBtn.disabled = !pv.canRun || (selectable.length > 0 && n === 0);
       all.checked = n === selectable.length && n > 0;
       all.indeterminate = n > 0 && n < selectable.length;
+      totals?.forEach((td, i) => {
+        const c = pv.columns[i];
+        if (c.total) td.textContent = K.fmt(Math.round(pv.rows.filter(included).reduce((t, r) => t + (numOf(r, c.key) ?? 0), 0)));
+      });
     };
-    // Remarque sous la première colonne de texte (nom de la carte…).
-    const noteCol = Math.max(
-      0,
-      pv.columns.findIndex((c) => c.align !== "end"),
-    );
-    const rowEls = pv.rows.map((r) => {
-      const tr = h(
-        "tr",
-        { class: r.selectable && s.excluded.has(r.id) ? "off" : "" },
-        h(
-          "td",
-          { class: "sel" },
-          r.selectable
-            ? h("input", {
-                type: "checkbox",
-                checked: !s.excluded.has(r.id),
-                "aria-label": "Inclure cette ligne",
-                onChange: (e) => {
-                  e.target.checked
-                    ? s.excluded.delete(r.id)
-                    : s.excluded.add(r.id);
-                  tr.classList.toggle("off", !e.target.checked);
-                  sync();
-                },
-              })
-            : null,
-        ),
-        pv.columns.map((c, i) =>
+    // Remarque et pastille de rareté dans la première colonne de texte (nom de la carte…).
+    const noteCol = Math.max(0, pv.columns.findIndex((c) => c.align !== "end"));
+    const setIncluded = (r, tr, on) => {
+      on ? s.excluded.delete(r.id) : s.excluded.add(r.id);
+      tr.classList.toggle("off", !on);
+      const box = tr.querySelector("td.sel input");
+      if (box) box.checked = on;
+    };
+    const rowEls = new Map(
+      pv.rows.map((r) => {
+        const tr = h(
+          "tr",
+          { class: r.selectable && s.excluded.has(r.id) ? "off" : "" },
           h(
             "td",
-            { class: c.align === "end" ? "end" : "" },
-            String(r.cells[c.key] ?? ""),
-            i === noteCol && r.note
-              ? h("span", { class: "note" }, r.note)
+            { class: "sel" },
+            r.selectable
+              ? h("input", {
+                  type: "checkbox",
+                  checked: !s.excluded.has(r.id),
+                  "aria-label": "Inclure cette ligne",
+                  onChange: (e) => {
+                    setIncluded(r, tr, e.target.checked);
+                    sync();
+                  },
+                })
               : null,
           ),
-        ),
-      );
-      if (!r.selectable) tr.classList.add("off");
-      return tr;
-    });
+          pv.columns.map((c, i) =>
+            h(
+              "td",
+              { class: c.align === "end" ? "end" : "" },
+              i === noteCol && r.rarity
+                ? h("span", { class: "rdot", style: `--rc:${K.COLORS[r.rarity]}`, title: K.LABELS[r.rarity] })
+                : null,
+              String(r.cells[c.key] ?? ""),
+              i === noteCol && r.note ? h("span", { class: "note" }, r.note) : null,
+            ),
+          ),
+        );
+        if (!r.selectable) tr.classList.add("off");
+        return [r, tr];
+      }),
+    );
     all.addEventListener("change", () => {
-      for (const r of selectable)
-        all.checked ? s.excluded.delete(r.id) : s.excluded.add(r.id);
-      render();
+      for (const r of selectable) setIncluded(r, rowEls.get(r), all.checked);
+      sync();
     });
+    // Tri : clic sur un en-tête (croissant, puis décroissant).
+    const tbody = h("tbody", {}, [...rowEls.values()]);
+    const sortBy = (c, th) => {
+      const dir = s.sort?.key === c.key && s.sort.dir === 1 ? -1 : 1;
+      s.sort = { key: c.key, dir };
+      th.parentElement.querySelectorAll("th").forEach((x) => x.removeAttribute("aria-sort"));
+      th.setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
+      const sorted = [...pv.rows].sort((a, b) => {
+        const x = numOf(a, c.key),
+          y = numOf(b, c.key);
+        const cmp = x != null && y != null ? x - y : String(a.cells[c.key] ?? "").localeCompare(String(b.cells[c.key] ?? ""), "fr");
+        return cmp * dir;
+      });
+      tbody.replaceChildren(...sorted.map((r) => rowEls.get(r)));
+    };
     sync();
     return {
       body: h(
         "div",
         { class: "bd" },
         h("p", { class: "summary" }, pv.summary),
-        pv.warnings?.length
-          ? h(
-              "ul",
-              { class: "warn-list" },
-              pv.warnings.map((w) => h("li", {}, w)),
-            )
-          : null,
+        pv.warnings?.length ? h("ul", { class: "warn-list" }, pv.warnings.map((w) => h("li", {}, w))) : null,
         pv.rows.length
           ? h(
               "div",
@@ -951,16 +1108,28 @@
                     "tr",
                     {},
                     h("th", { class: "sel" }, selectable.length ? all : null),
-                    pv.columns.map((c) =>
-                      h(
+                    pv.columns.map((c) => {
+                      const th = h(
                         "th",
-                        { class: c.align === "end" ? "end" : "" },
+                        {
+                          class: `sortable${c.align === "end" ? " end" : ""}`,
+                          title: "Trier",
+                          onClick: () => sortBy(c, th),
+                        },
                         c.label,
-                      ),
-                    ),
+                      );
+                      return th;
+                    }),
                   ),
                 ),
-                h("tbody", {}, rowEls),
+                tbody,
+                totals
+                  ? h(
+                      "tfoot",
+                      {},
+                      h("tr", {}, h("td", { class: "sel" }), totals),
+                    )
+                  : null,
               ),
             )
           : null,
@@ -1017,6 +1186,9 @@
     if (s.controller.signal.aborted) ctx.log("Arrêté.", "warn");
     s.phase = "done";
     s.preview = null;
+    s.outcome = s.logs.some((l) => l.tone === "error") ? "error" : "done";
+    // Vu tout de suite si le popover montre ce script ; sinon, marque sur le menu.
+    s.seen = current === script.id && isOpen();
     rerender(script.id);
   }
 
@@ -1028,9 +1200,25 @@
       h("span", { class: tone }, msg),
     );
 
+  async function copyLog(s, button) {
+    const text = s.logs.map(({ at, msg }) => `${at.toLocaleTimeString("fr-FR")}  ${msg}`).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "Copié ✓";
+    } catch {
+      button.textContent = "Copie impossible";
+    }
+    setTimeout(() => (button.textContent = "Copier le journal"), 1500);
+  }
+
   function viewRun(script, s) {
     const running = s.phase === "running";
     const stopping = running && s.controller.signal.aborted;
+    const copy = h(
+      "button",
+      { class: "btn link left", type: "button", onClick: () => copyLog(s, copy) },
+      "Copier le journal",
+    );
     const list = h(
       "ul",
       { class: "log", "aria-live": "polite" },
@@ -1059,6 +1247,7 @@
       ),
       footer: running
         ? [
+            copy,
             h(
               "button",
               {
@@ -1084,6 +1273,7 @@
             ),
           ]
         : [
+            copy,
             h(
               "button",
               {
