@@ -41,15 +41,14 @@
     try {
       const key = `params:${script.id}`;
       let saved = (await storage?.get(key))?.[key];
-      // Réglages d'un ancien script fusionné dans celui-ci : repris une fois.
+      // Réglages d'un ancien script fusionné dans celui-ci : repris une fois, ajoutés aux réglages actuels.
       for (const [oldId, map] of Object.entries(script.legacy ?? {})) {
-        if (saved) break;
-        const oldKey = `params:${oldId}`;
-        const old = (await storage?.get(oldKey))?.[oldKey];
-        if (old) {
-          saved = map(old);
-          storage?.set({ [key]: saved });
-        }
+        const oldKey = `params:${oldId}`,
+          doneKey = `migrated:${oldId}`;
+        const got = await storage?.get([oldKey, doneKey]);
+        if (!got?.[oldKey] || got[doneKey]) continue;
+        saved = { ...saved, ...map(got[oldKey]) };
+        storage?.set({ [key]: saved, [doneKey]: true });
       }
       return { ...defaultsOf(script), ...saved };
     } catch {
