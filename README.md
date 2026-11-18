@@ -67,7 +67,10 @@ autre joueur paie déjà plus sont ignorées. ⚠ L'endpoint de création est d�
 
 **⇄ Offres d'échange** — publie des offres du tableau : un doublon contre des cartes qui me manquent, de rareté égale ou
 supérieure, sans dépasser la **rareté max demandée** (Légendaire par défaut). Les **raretés de mes doublons à proposer**
-se choisissent avec les boutons colorés. Le site limite à 5 offres ouvertes : dès qu'une place se libère, la suivante part.
+se choisissent avec les boutons colorés. **Monter d'une rareté** (activé par défaut) : quand je possède toutes les
+cartes d'une rareté, ses doublons sont proposés contre des cartes de la rareté juste au-dessus et de valeur équivalente
+(écart max. 15 % par défaut), manquantes d'abord, sinon déjà possédées : ce nouveau doublon s'échangera ensuite contre
+une carte plus chère, et ainsi de suite. Le site limite à 5 offres ouvertes : dès qu'une place se libère, la suivante part.
 ⚠ L'endpoint de création est déduit : contrôle la première publication dans F12 > Réseau.
 
 **🤝 Préparer un échange** — ouvrir un échange (depuis le profil du joueur), puis lancer : démarrage direct, sans aperçu.

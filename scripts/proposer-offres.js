@@ -5,6 +5,9 @@
  *   - je veux  : des cartes qui me MANQUENT, de rareté égale ou SUPÉRIEURE à la carte donnée
  *                (jamais de perte au change) sans dépasser la rareté max demandée,
  *                rareté la plus proche d'abord ("closest")
+ *   - rareté complète (option « Monter d'une rareté ») : le doublon est proposé contre des cartes de la
+ *     rareté juste au-dessus et de valeur équivalente, même déjà possédées (nouveau doublon), manquantes
+ *     d'abord ; ce nouveau doublon s'échangera ensuite contre une carte plus chère, et ainsi de suite
  *   - une même carte n'est jamais demandée deux fois sur le tableau
  *   - une carte déjà mise aux enchères (ou en vente) n'est JAMAIS proposée à l'échange :
  *     vérifié à chaque cycle ET une dernière fois juste avant chaque publication ; si les
@@ -17,7 +20,7 @@
  * publie une offre à la main (« Proposer une carte »), puis recopie l'URL et le corps de la requête.
  */
 (() => {
-  const { register, LABELS, rank, atMost, spares } = KyaraExt;
+  const { register, LABELS, RARITIES, rank, atMost, spares, fmt } = KyaraExt;
 
   const buildBody = (giveId, wantIds) => ({ characterId: giveId, wantIds }); // À VÉRIFIER
 
@@ -31,8 +34,41 @@
   // Je reçois Y contre X : OK si Y est aussi rare ou plus rare que X, sans dépasser la rareté max demandée.
   const wantOk = (p, give, want) => (p.allowEqualRarity ? rank(want) <= rank(give) : rank(want) < rank(give)) && atMost(want, p.maxWantRarity);
 
-  function plan(p, catalog, { collectionRows, open, listedIds }, slots, excludedIds = new Set()) {
+  // Écart relatif au plus petit des deux prix.
+  const close = (a, b, percent) => a > 0 && b > 0 && Math.max(a, b) <= Math.min(a, b) * (1 + percent / 100) + 1e-8;
+  const nextRarity = (r) => RARITIES[rank(r) - 1];
+  // Raretés dont je possède toutes les cartes du catalogue.
+  const completeRarities = (catalog, owned) => new Set(RARITIES.filter((r) => [...catalog.values()].every((c) => c.rarity !== r || owned.get(c.id)?.qty > 0)));
+
+  // Prix utiles pour monter d'une rareté : mes doublons des raretés complètes et les cartes de la rareté au-dessus.
+  async function loadClimbPrices(ctx, p, catalog, collectionRows, prices) {
+    if (!p.climb) return prices;
+    const complete = completeRarities(catalog, new Map(collectionRows.map((e) => [e.characterId, e])));
+    const up = new Set([...complete].map(nextRarity).filter((r) => r && atMost(r, p.maxWantRarity)));
+    const ids = [
+      ...spares(collectionRows, catalog, { keepCopies: p.keepCopies, rarities: p.giveRarities })
+        .filter((x) => complete.has(x.card.rarity) && up.has(nextRarity(x.card.rarity)))
+        .map((x) => x.card.id),
+      ...[...catalog.values()].filter((c) => up.has(c.rarity)).map((c) => c.id),
+    ];
+    return ctx.loadPrices(ids, prices);
+  }
+
+  // Rareté complète : cartes de la rareté au-dessus, de valeur équivalente, manquantes d'abord puis les plus proches en prix.
+  function climbWanted(p, catalog, owned, prices, give, requested) {
+    const up = nextRarity(give.rarity);
+    const value = prices.get(give.id)?.value;
+    if (!up || !atMost(up, p.maxWantRarity) || !value) return [];
+    return [...catalog.values()]
+      .filter((c) => c.rarity === up && !requested.has(c.id) && close(value, prices.get(c.id)?.value, p.climbGapPercent))
+      .map((c) => ({ ...c, value: prices.get(c.id).value, owned: owned.get(c.id)?.qty > 0 }))
+      .sort((a, b) => a.owned - b.owned || Math.abs(a.value - value) - Math.abs(b.value - value) || a.name.localeCompare(b.name, "fr"))
+      .slice(0, p.maxWanted);
+  }
+
+  function plan(p, catalog, { collectionRows, open, listedIds }, slots, excludedIds = new Set(), prices = new Map()) {
     const owned = new Map(collectionRows.map((e) => [e.characterId, e]));
+    const complete = p.climb ? completeRarities(catalog, owned) : new Set();
     const alreadyOffered = new Set(open.map((o) => o.characterId));
     // Cartes déjà demandées par mes offres ouvertes + celles choisies pendant ce passage.
     const requested = new Set(open.flatMap((o) => o.wantIds ?? []));
@@ -48,22 +84,29 @@
     const result = [];
     for (const { card: give, n } of candidates) {
       if (result.length >= slots) break;
-      const wanted = missing
-        .filter((m) => wantOk(p, give.rarity, m.rarity) && !requested.has(m.id))
-        .sort((a, b) =>
-          p.wantOrder === "closest"
-            ? rank(b.rarity) - rank(a.rarity) || a.name.localeCompare(b.name, "fr")
-            : rank(a.rarity) - rank(b.rarity) || a.name.localeCompare(b.name, "fr"),
-        )
-        .slice(0, p.maxWanted);
+      const climbing = complete.has(give.rarity) ? climbWanted(p, catalog, owned, prices, give, requested) : [];
+      const wanted = climbing.length
+        ? climbing
+        : missing
+            .filter((m) => wantOk(p, give.rarity, m.rarity) && !requested.has(m.id))
+            .sort((a, b) =>
+              p.wantOrder === "closest"
+                ? rank(b.rarity) - rank(a.rarity) || a.name.localeCompare(b.name, "fr")
+                : rank(a.rarity) - rank(b.rarity) || a.name.localeCompare(b.name, "fr"),
+            )
+            .slice(0, p.maxWanted);
       if (wanted.length === 0) continue;
       wanted.forEach((w) => requested.add(w.id));
       result.push({
         giveId: give.id,
         rarity: give.rarity,
         wantIds: wanted.map((w) => w.id),
-        label: `${give.name} (${LABELS[give.rarity] ?? give.rarity}) ×${n} en trop`,
-        wantLabel: wanted.map((w) => `${w.name} (${w.rarity})`).join(", "),
+        label: climbing.length
+          ? `${give.name} (${LABELS[give.rarity] ?? give.rarity}, ${fmt(prices.get(give.id).value)} ◆) ×${n} en trop · rareté complète ↑`
+          : `${give.name} (${LABELS[give.rarity] ?? give.rarity}) ×${n} en trop`,
+        wantLabel: wanted
+          .map((w) => (climbing.length ? `${w.name} (${w.rarity}, ${fmt(w.value)} ◆${w.owned ? ", déjà à moi" : ""})` : `${w.name} (${w.rarity})`))
+          .join(", "),
       });
     }
     return result;
@@ -75,7 +118,8 @@
     icon: "⇄",
     category: "Échanges",
     short: "Doublons contre cartes manquantes",
-    description: "Publie des offres d'échange avec mes doublons contre des cartes qui me manquent, de rareté égale ou supérieure.",
+    description:
+      "Publie des offres d'échange avec mes doublons contre des cartes qui me manquent, de rareté égale ou supérieure. Rareté complète : contre des cartes de la rareté au-dessus de valeur équivalente.",
     params: [
       { key: "giveRarities", label: "Raretés de mes doublons à proposer", type: "raritySet", default: ["C", "U", "R", "E"] },
       {
@@ -116,6 +160,24 @@
         default: true,
         help: "Décoché : exiger une rareté strictement supérieure à la carte donnée.",
       },
+      {
+        key: "climb",
+        label: "Monter d'une rareté quand elle est complète",
+        type: "boolean",
+        default: true,
+        help: "Rareté complète : un doublon est proposé contre des cartes de la rareté au-dessus et de valeur équivalente, même déjà possédées. Le nouveau doublon s'échangera ensuite contre une carte plus chère.",
+      },
+      {
+        key: "climbGapPercent",
+        enabledWhen: { climb: true },
+        label: "Écart de valeur max. (%)",
+        type: "number",
+        default: 15,
+        min: 0,
+        max: 100,
+        step: 1,
+        title: "Écart entre la valeur du doublon donné et celle des cartes demandées, par rapport à la plus petite.",
+      },
       { key: "pollSec", label: "Vérification d'une place libre (s)", type: "number", default: 60, min: 10, max: 3600, group: "advanced" },
       { key: "delayMs", label: "Pause entre deux publications (ms)", type: "number", default: 1500, min: 0, max: 60000, group: "advanced" },
       { key: "maxFailures", label: "Arrêt après N cycles en échec", type: "number", default: 3, min: 1, max: 20, group: "advanced" },
@@ -128,11 +190,12 @@
       ctx.status("Lecture de la collection, des offres et du marché…");
       const s = await readState(ctx);
       if (!p.giveRarities.length) throw new Error("Choisis au moins une rareté de doublons à proposer.");
+      const prices = await loadClimbPrices(ctx, p, catalog, s.collectionRows, new Map());
       const freeSlots = p.maxOpenOffers - s.open.length;
       // Sans place libre, on montre quand même les prochaines offres qui partiront.
       const slots = Math.min(freeSlots > 0 ? freeSlots : p.maxOpenOffers, p.totalOffers);
       // Plan large pour pouvoir décocher des lignes et garder des remplaçantes.
-      const todo = plan(p, catalog, s, Math.min(p.totalOffers, slots + 10));
+      const todo = plan(p, catalog, s, Math.min(p.totalOffers, slots + 10), new Set(), prices);
 
       const warnings = [];
       if (freeSlots <= 0) warnings.push(`${s.open.length}/${p.maxOpenOffers} offres déjà ouvertes : la publication attendra qu'une place se libère.`);
@@ -163,6 +226,8 @@
 
     async run(ctx, p, { excludedIds }) {
       const catalog = await ctx.catalog();
+      // Prix gardés pendant toute l'exécution : seules les nouvelles cartes sont lues.
+      const prices = new Map();
       const st = { open: 0, published: 0, cycles: 0 };
       let lastStatus = "";
       let lastOpen = null;
@@ -197,7 +262,8 @@
           return false;
         }
 
-        const todo = plan(p, catalog, s, slots, excludedIds);
+        await loadClimbPrices(ctx, p, catalog, s.collectionRows, prices);
+        const todo = plan(p, catalog, s, slots, excludedIds, prices);
         if (todo.length === 0) {
           ctx.log("Plus rien à proposer (plus de doublon utile ou plus de carte à demander). Arrêt.", "warn");
           return true;
