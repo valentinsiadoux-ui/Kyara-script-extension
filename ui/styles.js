@@ -121,6 +121,9 @@ KyaraExt.styles = `
 .hd h2 { margin: 0; font-size: 15px; font-weight: 650; }
 .hd p { margin: 2px 0 0; color: var(--mut); font-size: 12px; }
 .hd .step { margin-left: auto; color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.hd .back { all: unset; cursor: pointer; padding: 0 8px; margin: -1px 0 0 -6px; border-radius: 6px; color: var(--mut); font-size: 18px; line-height: 1.4; }
+.hd .back:hover { background: var(--bg2); color: var(--fg); }
+.hd .back:focus-visible, .hd .x:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .hd .x { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 6px; color: var(--mut); font-size: 16px; }
 .hd .x:hover { background: var(--bg2); color: var(--fg); }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+- Bouton **←** (et Alt + ←) pour revenir à l'étape précédente : Aperçu → Réglages, Terminé → aperçu relu.
+- Les lignes décochées le restent quand on revient à l'aperçu ou qu'on le relance.
+
 ## 2.0.0
 
 ### Nouveautés

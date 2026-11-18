@@ -357,7 +357,10 @@
   }
   addEventListener("resize", () => isOpen() && position());
   pop.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
+    if (e.key === "ArrowLeft" && e.altKey) {
+      e.preventDefault();
+      backOf(scriptOf(current), sessions.get(current))?.run();
+    } else if (e.key === "Escape") {
       e.stopPropagation();
       close();
     }
@@ -384,6 +387,38 @@
   });
 
   // ---------- Rendu ----------
+  // Étape précédente : Aperçu (ou son chargement) -> Réglages ; Terminé -> nouvel aperçu, mêmes lignes cochées.
+  function backOf(script, s) {
+    if (s.phase === "loading")
+      return {
+        label: "Réglages",
+        run: () => {
+          s.controller.abort();
+          s.phase = "params";
+          render();
+        },
+      };
+    if (s.phase === "preview")
+      return {
+        label: "Réglages",
+        run: () => {
+          s.phase = "params";
+          render();
+        },
+      };
+    if (s.phase === "done" && script.skipPreview)
+      return {
+        label: "Réglages",
+        run: () => {
+          s.phase = "params";
+          render();
+        },
+      };
+    // L'aperçu est relu : ce qui vient d'être publié n'y figure plus, rien n'est relancé deux fois.
+    if (s.phase === "done") return { label: "Aperçu (relu)", run: () => startPreview(script, s) };
+    return null;
+  }
+
   function render() {
     const script = scriptOf(current);
     const s = sessions.get(current);
@@ -398,10 +433,24 @@
     // Aperçu avec beaucoup de colonnes : popover élargi.
     pop.classList.toggle("wide", s.phase === "preview" && s.preview?.columns.length > 6);
     if (isOpen()) requestAnimationFrame(position);
+    const back = backOf(script, s);
     pop.replaceChildren(
       h(
         "div",
         { class: "hd" },
+        back
+          ? h(
+              "button",
+              {
+                class: "back",
+                type: "button",
+                "aria-label": `Retour : ${back.label}`,
+                title: `Retour : ${back.label} (Alt + ←)`,
+                onClick: back.run,
+              },
+              "←",
+            )
+          : null,
         h("span", { class: "ic", "aria-hidden": "true" }, script.icon),
         h("div", {}, h("h2", { id: "kx-title" }, script.name), h("p", {}, script.description)),
         h("span", { class: "step" }, script.skipPreview ? { params: "Réglages", running: "Exécution", done: "Terminé" }[s.phase] : STEP_LABELS[s.phase]),
@@ -866,8 +915,12 @@
     try {
       const result = await script.preview(contextFor(script.id, s), s.values);
       if (controller.signal.aborted) return;
+      // Lignes décochées d'office (ex. cartes rares) ; une ligne déjà vue dans l'aperçu précédent garde son choix.
+      const before = s.preview?.rows ?? s.lastRows ?? [];
+      const seen = new Set(before.map((r) => r.id));
+      const byDefault = new Set(result.excluded ?? []);
+      s.excluded = new Set(result.rows.map((r) => r.id).filter((id) => (seen.has(id) ? s.excluded.has(id) : byDefault.has(id))));
       s.preview = result;
-      s.excluded = new Set(result.excluded ?? []); // lignes décochées d'office (ex. cartes rares)
       s.phase = "preview";
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -1097,6 +1150,7 @@
     }
     if (s.controller.signal.aborted) ctx.log("Arrêté.", "warn");
     s.phase = "done";
+    s.lastRows = s.preview?.rows ?? null; // choix des lignes repris par « Retour »
     s.preview = null;
     s.outcome = s.logs.some((l) => l.tone === "error") ? "error" : "done";
     // Vu tout de suite si le popover montre ce script ; sinon, marque sur le menu.

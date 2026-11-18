@@ -11,6 +11,10 @@ par rubrique (Marché, Échanges, Comptoir, Collection, Suivi). Chaque script ou
 3. **Exécution** : statut et journal en direct, **Arrêter**, **Copier le journal**. « Masquer » laisse tourner le script
    en arrière-plan.
 
+Le bouton **←** en haut à gauche du popover (ou **Alt + ←**) revient à l'étape précédente : de l'aperçu aux réglages,
+et d'une exécution terminée à un **aperçu relu** (ce qui vient d'être publié n'y figure plus). Les lignes décochées
+restent décochées d'un aperçu à l'autre.
+
 Sur le bouton et dans le menu, un point indique l'état : **vert clignotant** = en cours, **rouge** = terminé avec une
 erreur, **vert fixe** = terminé (disparaît une fois le script rouvert). Recharger la page arrête les scripts.
 
