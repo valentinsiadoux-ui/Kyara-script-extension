@@ -323,8 +323,7 @@
     position();
     updateBar();
     pop.querySelector("input, select, .btn.primary")?.focus();
-    if (id === "albums-a-remplir" && sessions.get(id).phase === "params")
-      startPreview(scriptOf(id), sessions.get(id));
+    if (id === "albums-a-remplir" && sessions.get(id).phase === "params") startPreview(scriptOf(id), sessions.get(id));
   }
   function close() {
     const s = sessions.get(current);
@@ -984,35 +983,135 @@
   };
 
   function viewAlbums(script, s) {
+    const changes = (s.preview.wishlistChanges ??= new Map());
+    const raw = s.preview.wishlist;
+    const entries = Array.isArray(raw) ? raw : (raw?.items ?? raw?.characterIds);
+    const wishId = (entry) => entry?.characterId ?? entry?.character?.id ?? entry;
+    const wishlist = Array.isArray(entries) && entries.every((e) => /^(\d+)$/.test(String(wishId(e)))) ? new Set(entries.map((e) => String(wishId(e)))) : null;
     const rarity = script.params[0];
     const picker = rarityMax(rarity, s.values.maxRarity);
     const limit = picker.querySelector("input");
-    const search = h("input", { type: "search", placeholder: "Chercher un album…" , "aria-label": "Chercher un album" });
+    const search = h("input", { type: "search", placeholder: "Chercher un album…", "aria-label": "Chercher un album" });
     const count = h("p", { class: "album-count", role: "status" });
     const list = h("div", { class: "album-list" });
+    const cooldown = h("span", { class: "album-cooldown", role: "timer" });
+    const cooldownBar = h("div", { class: "album-cooldown-bar", hidden: true }, cooldown);
+    const remaining = () => Math.max(0, Math.ceil(((s.albumCooldownUntil ?? 0) - Date.now()) / 1000));
+    let cooldownTimer;
+    const updateCooldown = () => {
+      clearTimeout(cooldownTimer);
+      const seconds = remaining();
+      const pending = !!s.albumWishlistPending;
+      cooldownBar.hidden = seconds === 0 && !pending;
+      const label = seconds ? `Prochaine action disponible dans ${seconds} s` : pending ? "Mise à jour…" : "";
+      if (cooldown.textContent !== label) cooldown.textContent = label;
+      for (const button of list.querySelectorAll("[data-wishlist-action]")) {
+        button.disabled = seconds > 0 || pending || button.hasAttribute("data-wishlist-pending");
+      }
+      if ((seconds || pending) && cooldown.isConnected) cooldownTimer = setTimeout(updateCooldown, 250);
+    };
     const refresh = () => {
       const query = search.value.trim().toLocaleLowerCase("fr");
-      const albums = s.preview.albums.filter(a => a.name.toLocaleLowerCase("fr").includes(query) &&
-        (limit.value === "M" || a.missing.every(c => K.rank(c.rarity) >= K.rank(limit.value))));
+      const albums = s.preview.albums.filter(
+        (a) => a.name.toLocaleLowerCase("fr").includes(query) && (limit.value === "M" || a.missing.every((c) => K.RARITIES.includes(c.rarity) && K.rank(c.rarity) >= K.rank(limit.value))),
+      );
       count.textContent = albums.length ? albums.length + " album(s) à remplir" : "Aucun album avec ces filtres.";
-      list.replaceChildren(...albums.map(a => {
-        const owned = a.total - a.missing.length;
-        const cards = h("ul", { class: "album-cards" });
-        const row = h("details", { class: "album-card" },
-          h("summary", {},
-            h("span", { class: "album-title" }, a.name),
-            h("span", { class: "album-missing" }, a.missing.length + " à trouver"),
-            h("progress", { value: owned, max: a.total, "aria-label": "Cartes possédées" }),
-            h("span", { class: "album-owned" }, owned + " / " + a.total)),
-          cards);
-        row.addEventListener("toggle", () => {
-          if (!row.open || cards.childElementCount) return;
-          cards.append(...a.missing.map(c => h("li", {},
-            h("span", { class: "rdot", style: "--rc:" + K.COLORS[c.rarity], title: K.LABELS[c.rarity] }),
-            c.name, h("small", {}, K.LABELS[c.rarity]))));
-        });
-        return row;
-      }));
+      list.replaceChildren(
+        ...albums.map((a) => {
+          const owned = a.total - a.missing.length;
+          const maxMissing = K.RARITIES[Math.min(...a.missing.map(c => K.rank(c.rarity)))];
+          const cards = h("ul", { class: "album-cards" });
+          const feedback = h("small", { role: "status" });
+          const initial = wishlist ? a.missing.every((c) => wishlist.has(String(c.id))) : null;
+          const button = h("button", {
+            type: "button",
+            class: "btn",
+            "data-wishlist-action": "",
+            onClick: async () => {
+              if (remaining() || s.albumWishlistPending) return;
+              const added = changes.get(a.name)?.added ?? initial;
+              const remove = added === true;
+              changes.set(a.name, { added, pending: true });
+              s.albumWishlistPending = true;
+              s.albumCooldownUntil = Date.now() + 10000;
+              updateButtons();
+              updateCooldown();
+              try {
+                await contextFor(script.id, s).api("/me/wishlist/series" + (remove ? "/remove" : ""), {
+                  method: "POST",
+                  body: { series: a.name },
+                  retries: 0,
+                  timeoutMs: 12000,
+                });
+                changes.set(a.name, { added: !remove });
+              } catch (error) {
+                if (error.status === 429) {
+                  const seconds = Number(error.message.match(/dans\s+(\d+)\s*s/i)?.[1]) || 10;
+                  s.albumCooldownUntil = Date.now() + seconds * 1000;
+                  changes.set(a.name, { added });
+                  updateCooldown();
+                } else {
+                  changes.set(a.name, { added, message: error.message });
+                }
+              }
+              s.albumWishlistPending = false;
+              updateCooldown();
+              if (feedback.isConnected) updateButtons();
+              else if (list.isConnected) refresh();
+              else rerender(script.id);
+            },
+          });
+          const updateButtons = () => {
+            const result = changes.get(a.name);
+            const added = result?.added ?? initial;
+            const partial = added === false && !result && wishlist?.size && a.missing.some((c) => wishlist.has(String(c.id)));
+            button.textContent = added === true ? "✕ Retirer les cartes de mes envies" : "♡ Ajouter les cartes manquantes à mes envies";
+            button.toggleAttribute("data-wishlist-pending", !!result?.pending);
+            button.disabled = !!result?.pending || !!s.albumWishlistPending || remaining() > 0;
+            feedback.textContent = result?.pending
+              ? "Mise à jour…"
+              : (result?.message ?? (added === null ? "Statut indisponible" : added ? "Dans tes envies" : partial ? "Partiellement dans tes envies" : ""));
+          };
+          updateButtons();
+          const row = h(
+            "details",
+            { class: "album-card" },
+            h(
+              "summary",
+              {},
+              h(
+                "a",
+                {
+                  class: "album-title",
+                  href: "/collection?" + new URLSearchParams({ serie: a.name }),
+                },
+                a.name,
+              ),
+              h("span", { class: "album-missing" },
+                a.missing.length + " à trouver",
+                maxMissing ? h("span", { class: "album-max-rarity", style: "--rc:" + K.COLORS[maxMissing], title: "Rareté maximale manquante : " + K.LABELS[maxMissing] }, maxMissing) : null),
+              h("progress", { value: owned, max: a.total, "aria-label": "Cartes possédées" }),
+              h("span", { class: "album-owned" }, owned + " / " + a.total),
+            ),
+            cards,
+          );
+          row.addEventListener("toggle", () => {
+            if (!row.open || cards.childElementCount) return;
+            cards.append(
+              ...a.missing.map((c) =>
+                h(
+                  "li",
+                  {},
+                  h("span", { class: "rdot", style: "--rc:" + K.COLORS[c.rarity], title: K.LABELS[c.rarity] }),
+                  c.name,
+                  h("small", {}, K.LABELS[c.rarity]),
+                ),
+              ),
+            );
+          });
+          return h("div", {}, row, h("div", { class: "album-count" }, button, " ", feedback));
+        }),
+      );
     };
     search.addEventListener("input", refresh);
     limit.addEventListener("change", () => {
@@ -1021,8 +1120,10 @@
       refresh();
     });
     refresh();
+    queueMicrotask(updateCooldown);
     return {
-      body: h("div", { class: "bd" }, h("div", { class: "album-filters field" }, search, picker), count, list),
+      body: h("div", { class: "bd" }, cooldownBar, h("div", { class: "album-filters field" }, search,
+        h("span", {}, "Rareté maximale des cartes manquantes"), picker), count, list),
       footer: [
         h("button", { type: "button", class: "btn", onClick: () => startPreview(script, s) }, "Actualiser"),
         h("button", { type: "button", class: "btn primary", onClick: backOf(script, s).run }, "Retour au menu"),

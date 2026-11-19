@@ -210,6 +210,10 @@ textarea:focus-visible { border-color: var(--acc); }
 .album-filters input[type=search]:focus-visible { border-color: var(--acc); }
 .album-filters input[type=search]::placeholder { color: var(--mut); }
 .album-count { font-size: 12px; color: var(--mut); margin: 12px 0 8px; }
+.album-cooldown { display: inline-flex; margin-top: 8px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg2); color: var(--fg); font-size: 12px; font-variant-numeric: tabular-nums; }
+.album-cooldown-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; height: 0; pointer-events: none; }
+.album-cooldown-bar[hidden] { display: none; }
+.album-cooldown-bar .album-cooldown { height: max-content; margin-top: 0; background: var(--bg2); box-shadow: 0 2px 8px #0004; }
 .album-list { display: grid; gap: 8px; }
 .album-card { margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
 .album-card > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 10px 12px; margin: 0; }
@@ -218,6 +222,7 @@ textarea:focus-visible { border-color: var(--acc); }
 .album-title::before { content: "▸"; margin-right: 6px; color: var(--acc); }
 .album-card[open] .album-title::before { content: "▾"; }
 .album-missing { color: var(--fg); }
+.album-max-rarity { display: inline-flex; align-items: center; justify-content: center; margin-left: 6px; min-width: 20px; height: 20px; border: 1px solid var(--rc); border-radius: 5px; font-weight: 700; color: var(--rc); }
 .album-card progress { width: 100%; height: 8px; align-self: center; accent-color: var(--acc); }
 .album-owned { justify-self: end; }
 .album-cards { margin: 0; padding: 4px 12px 10px; list-style: none; }

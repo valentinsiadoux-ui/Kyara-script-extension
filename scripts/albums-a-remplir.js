@@ -20,10 +20,11 @@
     ],
     async preview(ctx) {
       ctx.status("Lecture de la collection et des missions…");
-      const [catalog, collection, progress] = await Promise.all([
+      const [catalog, collection, progress, wishlist] = await Promise.all([
         ctx.catalog(),
         ctx.api("/me/collection?lean=1"),
         ctx.api("/me/progress"),
+        ctx.api("/me/wishlist").catch(() => null),
       ]);
       if (!Array.isArray(progress?.series)) throw new Error("Historique des missions d’albums indisponible.");
       const completed = new Set(progress.series.filter(s => s.claimed || s.completedAt).map(s => s.series));
@@ -41,6 +42,7 @@
         .sort((a, b) => a.missing.length - b.missing.length || a.name.localeCompare(b.name, "fr"));
       return {
         albums: matches,
+        wishlist,
         rows: [],
         columns: [],
         canRun: false,

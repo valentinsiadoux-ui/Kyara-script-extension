@@ -130,8 +130,8 @@
       if (signal.aborted) throw new StoppedError();
     };
 
-    async function api(path, { method = "GET", body, withPass = false } = {}) {
-      for (let attempt = 0; attempt < 5; attempt++) {
+    async function api(path, { method = "GET", body, withPass = false, retries = 4, timeoutMs } = {}) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
         checkStopped();
         const wait = takeTurn();
         if (wait > 0) await sleep(wait);
@@ -143,15 +143,18 @@
         const pass = withPass ? readPass() : null;
         if (pass) headers["x-pass"] = pass;
         let res;
+        const timeout = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
         try {
-          res = await pageFetch(`${location.origin}/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+          res = await pageFetch(`${location.origin}/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: timeout });
         } catch {
+          if (timeout?.aborted) throw new ApiError(0, "timeout", "Kyara tarde à répondre. Actualise la liste pour vérifier le statut.");
           throw new ApiError(0, "network", "Réseau injoignable : vérifie ta connexion.");
         }
         rush = Number(res.headers.get("x-kyara-rush")) || 1;
         const data = await res.json().catch(() => null);
+        if (timeout?.aborted) throw new ApiError(0, "timeout", "Kyara tarde à répondre. Actualise la liste pour vérifier le statut.");
         if (res.ok) return data;
-        if ((res.status === 429 || res.status === 503) && attempt < 4) {
+        if ((res.status === 429 || res.status === 503) && attempt < retries) {
           await sleep(2000 * 2 ** attempt);
           continue;
         }
