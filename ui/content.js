@@ -1103,7 +1103,7 @@
                   "li",
                   {},
                   h("span", { class: "rdot", style: "--rc:" + K.COLORS[c.rarity], title: K.LABELS[c.rarity] }),
-                  c.name,
+                  h("a", { class: "album-card-link", href: "/wiki/" + encodeURIComponent(c.id) }, c.name),
                   h("small", {}, K.LABELS[c.rarity]),
                 ),
               ),

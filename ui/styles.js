@@ -228,6 +228,8 @@ textarea:focus-visible { border-color: var(--acc); }
 .album-cards { margin: 0; padding: 4px 12px 10px; list-style: none; }
 .album-cards li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; }
 .album-cards small { margin-left: auto; color: var(--mut); }
+.album-card-link { color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
+.album-card-link:hover, .album-card-link:focus-visible { color: var(--acc); text-decoration: underline; }
 
 /* Aperçu */
 .summary { margin: 0 0 10px; }
