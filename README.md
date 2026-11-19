@@ -89,6 +89,13 @@ une carte plus chère, et ainsi de suite. Le site limite à 5 offres ouvertes : 
   doubles manquants de valeur équivalente (écart max. réglable).
 - L'arrêt conserve les cartes déjà ajoutées.
 
+**📥 Échanges reçus** — analyse les propositions d'échange reçues en attente et donne un verdict pour chacune :
+**⛔ Impossible** (une carte demandée n'a pas d'exemplaire libre, ou chakra insuffisant), **⚠ Perte de collection**
+(l'échange prend un exemplaire gardé), **✅ Avantageux** ou **❌ Défavorable**. Mes cartes sont comptées au prix net d'une
+vente au marché (au moins leur recyclage), les siennes au prix du marché, le chakra à sa valeur. Deux propositions qui
+demandent le même doublon se le partagent, les plus avantageuses d'abord. Rien n'est coché d'office : les lignes cochées
+sont acceptées (code d'accès requis) ou refusées, selon le réglage.
+
 ### Comptoir
 
 **📣 Poster une annonce** — modèles de message, aperçu tel quel, puis publication au comptoir (`/marche/chat`) :
