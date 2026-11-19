@@ -75,8 +75,9 @@
     return ids;
   }
   // Doubles manquants des deux côtés lus par l'API (comme Kyara Plus) : [mes doublons qui lui manquent,
-  // ses doublons qui me manquent], ids -> rareté. null hors d'un profil ou si l'API échoue : filtres du site seuls.
-  async function apiPools(ctx) {
+  // ses doublons qui me manquent], ids -> rareté, puis pourquoi certains de mes doublons sont indisponibles.
+  // null hors d'un profil ou si l'API échoue : filtres du site seuls.
+  async function apiPools(ctx, p) {
     const userId = location.pathname.match(/^\/profil\/([^/?#]+)/)?.[1];
     if (!userId) return null;
     try {
@@ -97,7 +98,7 @@
       const receive = new Map(
         available.filter((r) => r.n >= 2 && !iOwn.has(String(r.characterId))).map((r) => [String(r.characterId), catalog.get(r.characterId)?.rarity]),
       );
-      return [give, receive];
+      return [give, receive, K.sparesNote(mine, catalog, { keepCopies: 1, rarities: raritiesOf(p, 0) })];
     } catch (e) {
       if (e instanceof K.StoppedError) throw e;
       ctx.log(`Inventaires illisibles par l'API (${e.message}) : filtres du site seuls.`, "warn");
@@ -376,7 +377,7 @@
       // Échange : deux côtés ; Achat : ses doublons seuls ; Vente : mes doublons seuls ; Compléter : le côté le moins chargé.
       const sides = complete ? [fill] : { trade: [0, 1], buy: [1], sell: [0] }[p.mode];
       const ids = await reserved(ctx);
-      const api = await apiPools(ctx);
+      const api = await apiPools(ctx, p);
       guard(ctx, form);
       // Rien d'éligible d'après l'API : inutile de charger les inventaires du site.
       const noneLeft =
@@ -388,7 +389,7 @@
       if (noneLeft?.length && ((trade && p.balance) || noneLeft.length === sides.length)) {
         ctx.status("Aucun double manquant éligible.");
         ctx.log(
-          `Aucun double manquant éligible côté « ${noneLeft.map((side) => labels[side]).join(" » et « ")} » avec ces raretés. Aucune carte ajoutée.`,
+          `Aucun double manquant éligible côté « ${noneLeft.map((side) => labels[side]).join(" » et « ")} » avec ces raretés.${noneLeft.includes(0) && api[2] ? ` Mes ${api[2]}.` : ""} Aucune carte ajoutée.`,
           "warn",
         );
         return;

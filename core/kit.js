@@ -225,12 +225,36 @@
   }
 
   // ---------- Doublons ----------
-  // Règle unique : hors épinglées et occupées, n = min(exemplaires vendables, exemplaires − à garder).
+  // Règle unique : hors épinglées et occupées, n = min(exemplaires libres, exemplaires non engagés − à garder).
+  // listable exclut les exemplaires engagés (locked : en vente, en offre, en échange) et ceux sous délai de revente
+  // (resaleLocked, jusqu'à resaleUntil) : le site refuse aussi de les échanger.
   function spares(rows, catalog, { keepCopies = 1, rarities = null, maxRarity = null, busy = null } = {}) {
     return rows
       .filter((e) => !e.pinned && e.qty > 0 && !busy?.has(e.characterId))
-      .map((e) => ({ card: catalog.get(e.characterId), entry: e, n: Math.min(e.listable ?? e.qty, e.qty - keepCopies) }))
+      .map((e) => ({ card: catalog.get(e.characterId), entry: e, n: Math.min(e.listable ?? e.qty, e.qty - (e.locked ?? 0) - keepCopies) }))
       .filter((x) => x.card && x.n > 0 && (!rarities || rarities.includes(x.card.rarity)) && atMost(x.card.rarity, maxRarity));
+  }
+
+  // Cartes en double que spares() écarte, et pourquoi. null si aucune.
+  function sparesNote(rows, catalog, { keepCopies = 1, rarities = null, maxRarity = null, busy = null } = {}) {
+    const free = new Set(spares(rows, catalog, { keepCopies, rarities, maxRarity, busy }).map((x) => x.entry.characterId));
+    const held = rows.filter((e) => {
+      const card = catalog.get(e.characterId);
+      return card && !free.has(e.characterId) && e.qty > keepCopies && (!rarities || rarities.includes(card.rarity)) && atMost(card.rarity, maxRarity);
+    });
+    const names = (list) => list.slice(0, 3).map((e) => catalog.get(e.characterId).name).join(", ") + (list.length > 3 ? "…" : "");
+    const when = (iso) => new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    const pinned = held.filter((e) => e.pinned);
+    const resale = held.filter((e) => !e.pinned && e.resaleLocked > 0);
+    const engaged = held.filter((e) => !e.pinned && !(e.resaleLocked > 0));
+    const parts = [];
+    if (resale.length) {
+      const first = resale.map((e) => e.resaleUntil).filter(Boolean).sort()[0];
+      parts.push(`${resale.length} bloquée(s) par le site (délai de revente)${first ? `, première libérée le ${when(first)}` : ""} (${names(resale)})`);
+    }
+    if (engaged.length) parts.push(`${engaged.length} déjà en vente, en offre ou écartée(s) (${names(engaged)})`);
+    if (pinned.length) parts.push(`${pinned.length} épinglée(s)`);
+    return parts.length ? `cartes en double indisponibles : ${parts.join(" ; ")}` : null;
   }
 
   function register(def) {
@@ -257,6 +281,7 @@
     loadPrices,
     busyCards,
     spares,
+    sparesNote,
     register,
     StoppedError,
     ApiError,
