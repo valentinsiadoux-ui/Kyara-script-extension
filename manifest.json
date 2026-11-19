@@ -27,6 +27,7 @@
         "core/kit.js",
         "scripts/proposer-offres.js",
         "scripts/preparer-echange.js",
+        "scripts/echanges-recus.js",
         "scripts/annonces.js",
         "scripts/lib/marche.js",
         "scripts/vente.js",
