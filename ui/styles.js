@@ -12,7 +12,6 @@ KyaraExt.styles = `
   font: 500 13px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #ececf1;
 }
-.bar { position: relative; display: flex; flex-direction: column; align-items: flex-end; }
 .trigger {
   all: unset;
   position: relative;
@@ -26,9 +25,12 @@ KyaraExt.styles = `
   background: #17171fee;
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 20px rgba(0,0,0,.35);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   white-space: nowrap;
 }
+.trigger:active { cursor: grabbing; }
 .trigger:hover, .trigger[aria-expanded="true"] { border-color: #8b7bff; }
 .trigger:focus-visible, .menu button:focus-visible { outline: 2px solid #8b7bff; outline-offset: 2px; }
 .trigger .logo {
@@ -39,9 +41,7 @@ KyaraExt.styles = `
 .trigger .chev { color: #9a9aab; font-size: 11px; }
 .trigger[aria-expanded="true"] .chev { transform: rotate(180deg); }
 .menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  position: fixed;
   width: min(300px, calc(100vw - 32px));
   max-height: calc(100vh - 140px);
   overflow-y: auto;
@@ -112,6 +112,16 @@ KyaraExt.styles = `
 }
 .pop.open { display: flex; }
 .pop.wide { width: min(1000px, calc(100vw - 32px)); }
+:host(.kx-detached) { font: 500 13px/1.3 system-ui, sans-serif; color: #ececf1; }
+:host(.kx-detached) .menu,
+:host(.kx-detached) .pop {
+  position: relative;
+  width: calc(100% - 16px);
+  max-height: calc(100dvh - 16px);
+  margin: 8px;
+  box-shadow: none;
+}
+:host(.kx-detached) .collapse { display: none; }
 @media (prefers-color-scheme: light) {
   .pop { --bg: #fff; --bg2: #f4f4f8; --line: #e1e1ea; --fg: #1b1b24; --mut: #666678; --info: #7a3fd1; --ok: #138a52; --warn: #b36b00; --err: #c62828; }
 }
