@@ -134,7 +134,11 @@
     input.dispatchEvent(new Event("change", { bubbles: true }));
   };
   // Raretés cochées du côté, limitées par la rareté max commune.
-  const raritiesOf = (p, side) => (side ? p.receiveRarities : p.giveRarities).filter((r) => K.atMost(r, p.maxRarity));
+  const raritiesOf = (p, side) => {
+    const rarities = side ? p.receiveRarities : p.giveRarities;
+    if (p.mode === "buy" || p.mode === "sell") return rarities;
+    return rarities.filter((r) => K.atMost(r, p.maxRarity));
+  };
   function checkRarities(p, side) {
     const rarities = raritiesOf(p, side);
     if (!Array.isArray(rarities) || !rarities.length || rarities.some((r) => !K.RARITIES.includes(r)))
@@ -292,6 +296,7 @@
       },
       {
         key: "maxRarity",
+        enabledWhen: { mode: ["trade", "complete"] },
         label: "Rareté max (les deux côtés)",
         type: "rarityMax",
         default: "M",

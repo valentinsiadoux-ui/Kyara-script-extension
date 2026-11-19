@@ -7,7 +7,7 @@
   if (!K || window.top !== window || document.getElementById("kx-bar-host")) return;
 
   const MAX_LOGS = 500;
-  const CATEGORIES = ["Marché", "Échanges", "Comptoir", "Collection", "Suivi"];
+  const CATEGORIES = ["Marché", "Échanges", "Comptoir", "Collection"];
   const STEP_LABELS = {
     params: "1 · Réglages",
     loading: "2 · Aperçu",
@@ -158,7 +158,9 @@
     h("span", { class: "lbl" }, "Scripts"),
     h("span", { class: "chev", "aria-hidden": "true" }, "▾"),
   );
-  const detachButton = h("button", { type: "button", role: "menuitem", onClick: toggleDetached },
+  const detachButton = h("button", {
+    type: "button", role: "menuitem", title: "Détacher le menu", onClick: toggleDetached,
+  },
     h("span", { class: "ic", "aria-hidden": "true" }, "↗"),
     h("span", { class: "txt" }, "Détacher le menu"),
   );
@@ -171,7 +173,7 @@
       "aria-label": "Scripts Kyara",
       hidden: true,
     },
-    // Une rubrique par catégorie, dans l'ordre de CATEGORIES ; le reste à la fin.
+    h("div", { class: "menu-body", role: "presentation" },
     [...new Set([...CATEGORIES, ...K.scripts.map((s) => s.category ?? "Autres")])]
       .map((cat) => [cat, K.scripts.filter((s) => (s.category ?? "Autres") === cat)])
       .filter(([, scripts]) => scripts.length)
@@ -188,7 +190,8 @@
                 role: "menuitem",
                 "data-id": s.id,
                 "aria-haspopup": "dialog",
-                title: s.description,
+                "aria-label": s.name,
+                title: `${s.name} — ${s.description}`,
                 onClick: () => {
                   toggleMenu(false);
                   open(s.id);
@@ -199,10 +202,10 @@
             ),
           ),
         ),
-      ),
+      )),
     h(
       "div",
-      { class: "sec" },
+      { class: "menu-tools", role: "group", "aria-label": "Options du menu" },
       detachButton,
       h(
         "button",
@@ -210,6 +213,7 @@
           type: "button",
           role: "menuitem",
           class: "collapse",
+          title: "Réduire le bouton",
           onClick: () => {
             ui.collapsed = !ui.collapsed;
             saveUi(ui);
@@ -218,10 +222,12 @@
           },
         },
         h("span", { class: "ic", "aria-hidden": "true" }, "⇲"),
-        h("span", { class: "txt" }, h("small", {}, "Réduire / agrandir le bouton")),
+        h("span", { class: "txt" }, "Réduire le bouton"),
       ),
     ),
   );
+  const menuBody = menu.querySelector(".menu-body");
+  const collapseButton = menu.querySelector(".collapse");
   barRoot.append(h("style", {}, K.styles), trigger, menu);
 
   function toggleMenu(force = menu.hidden) {
@@ -243,10 +249,10 @@
       if (detached) return reattach();
       toggleMenu(false);
       trigger.focus();
-    } else if (e.key === "ArrowDown") {
+    } else if (e.key === "ArrowDown" || e.key === "ArrowRight") {
       e.preventDefault();
       items[(i + 1) % items.length].focus();
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
       e.preventDefault();
       items[(i - 1 + items.length) % items.length].focus();
     }
@@ -307,6 +313,10 @@
   }
   function applyUi() {
     trigger.classList.toggle("mini", !!ui.collapsed);
+    const action = ui.collapsed ? "Agrandir le bouton" : "Réduire le bouton";
+    collapseButton.title = action;
+    collapseButton.setAttribute("aria-label", action);
+    collapseButton.lastChild.textContent = action;
     placeTrigger(ui.left, Number.isFinite(ui.top) ? ui.top : 76);
   }
   loadUi().then((saved) => {
@@ -366,9 +376,12 @@
       if (hasPopoverApi && pop.matches(":popover-open")) pop.hidePopover();
       detached = popup;
       root.append(menu, pop);
-      Object.assign(menu.style, { left: "", top: "", bottom: "", maxHeight: "" });
-      Object.assign(pop.style, { left: "", top: "", bottom: "", maxHeight: "" });
-      detachButton.lastChild.textContent = "Rattacher le menu";
+      for (const panel of [menu, pop]) {
+        Object.assign(panel.style, { left: "", top: "", bottom: "" });
+        panel.style.removeProperty("--panel-height");
+      }
+      detachButton.title = detachButton.lastChild.textContent = "Rattacher le menu";
+      popup.addEventListener("resize", updateMenuLayout);
       popup.addEventListener("pagehide", () => {
         if (detached === popup) reattach(false);
       }, { once: true });
@@ -376,7 +389,7 @@
     } catch {
       if (detached) reattach();
       else popup?.close();
-      detachButton.lastChild.textContent = "Fenêtre bloquée · Réessayer";
+      detachButton.title = detachButton.lastChild.textContent = "Fenêtre bloquée · Réessayer";
     }
   }
 
@@ -386,7 +399,7 @@
     barRoot.append(menu);
     popRoot.append(pop);
     if (closeWindow) popup.close();
-    detachButton.lastChild.textContent = "Détacher le menu";
+    detachButton.title = detachButton.lastChild.textContent = "Détacher le menu";
     if (isOpen() && hasPopoverApi) pop.showPopover();
     toggleMenu(!isOpen());
     position();
@@ -433,16 +446,36 @@
     const above = r.top - 16;
     for (const panel of [menu.hidden ? null : menu, isOpen() ? pop : null]) {
       if (!panel) continue;
-      const up = above > below && (panel === pop || below < panel.scrollHeight);
+      const menuHeight = menuBody.scrollHeight + menu.offsetHeight - menuBody.clientHeight;
+      const up = above > below && (panel === pop || below < menuHeight);
       const width = panel.getBoundingClientRect().width;
+      panel.style.setProperty("--panel-height", `${Math.max(0, up ? above : below)}px`);
       Object.assign(panel.style, {
         left: `${clamp(r.right - width, innerWidth - width)}px`,
         top: up ? "auto" : `${r.bottom + 8}px`,
         bottom: up ? `${innerHeight - r.top + 8}px` : "auto",
-        maxHeight: `${Math.max(0, Math.min(760, up ? above : below))}px`,
       });
     }
   }
+  function updateMenuLayout() {
+    const requestedHeight = parseFloat(menu.style.height);
+    const availableHeight = parseFloat(menu.style.getPropertyValue("--panel-height"));
+    const height = detached
+      ? detached.innerHeight - 16
+      : Math.min(requestedHeight || Infinity, Number.isFinite(availableHeight) ? availableHeight : Infinity);
+    menu.classList.toggle("horizontal-compact", height <= 230);
+    menu.classList.toggle("icons-only", height <= 135);
+  }
+  const panelResize = new ResizeObserver((entries) => {
+    updateMenuLayout();
+    if (detached) return;
+    for (const { target } of entries) {
+      const { left, right, width } = target.getBoundingClientRect();
+      if (width && right > innerWidth - 8) target.style.left = `${clamp(left, innerWidth - width)}px`;
+    }
+  });
+  panelResize.observe(menu);
+  panelResize.observe(pop);
   pop.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft" && e.altKey) {
       e.preventDefault();

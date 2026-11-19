@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kyara Scripts",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Lance des scripts sur kyara.games depuis des boutons, avec réglages et aperçu avant exécution.",
   "permissions": ["storage"],
   "host_permissions": ["https://kyara.games/*"],
@@ -33,7 +33,6 @@
         "scripts/ordres-achat.js",
         "scripts/recyclage.js",
         "scripts/albums-a-remplir.js",
-        "scripts/tableau-de-bord.js",
         "ui/styles.js",
         "ui/content.js"
       ]
