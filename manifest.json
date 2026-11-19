@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kyara Scripts",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "Lance des scripts sur kyara.games depuis des boutons, avec réglages et aperçu avant exécution.",
   "permissions": ["storage"],
   "host_permissions": ["https://kyara.games/*"],
