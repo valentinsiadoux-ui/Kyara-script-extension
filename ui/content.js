@@ -1,5 +1,5 @@
 /*
- * Interface : un menu déroulant flottant en haut à droite (un élément par script), et un popover en trois étapes
+ * Interface : un menu flottant déplaçable et un panneau en trois étapes
  *   1. réglages  ->  2. aperçu (Confirmer / Modifier / Annuler)  ->  3. exécution (journal, Arrêter)
  */
 (() => {
@@ -72,7 +72,7 @@
       /* stockage indisponible */
     }
   }
-  // Préférences du menu : position verticale, bouton réduit.
+  // Préférences du menu : position du bouton, bouton réduit.
   async function loadUi() {
     try {
       return (await storage?.get("ui"))?.ui ?? {};
@@ -118,7 +118,7 @@
   const scriptOf = (id) => K.scripts.find((s) => s.id === id);
   let current = null;
 
-  // ---------- Menu flottant (en haut à droite, par-dessus la page) ----------
+  // ---------- Menu flottant ----------
   const barHost = h("div", { id: "kx-bar-host", class: "kx-bar-host" });
   const barRoot = barHost.attachShadow({ mode: "open" });
   const trigger = h(
@@ -130,35 +130,37 @@
       "aria-expanded": "false",
       "aria-controls": "kx-menu",
       title: "Scripts Kyara — glisser pour déplacer",
-      onClick: () => {
-        // La fin d'un glisser n'ouvre pas le menu.
-        if (drag?.moved) return void (drag = null);
+      onClick: (e) => {
+        if (e.detail && suppressClick) return;
+        if (detached) return detached.focus();
         toggleMenu();
       },
       onPointerDown: (e) => {
-        if (e.button !== 0) return;
-        drag = { id: e.pointerId, y: e.clientY, top: barHost.getBoundingClientRect().top, moved: false };
+        if (e.button !== 0 || !e.isPrimary) return;
+        suppressClick = false;
+        const { left, top } = trigger.getBoundingClientRect();
+        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left, top, moved: false };
         trigger.setPointerCapture(e.pointerId);
       },
       onPointerMove: (e) => {
         if (!drag || drag.id !== e.pointerId) return;
+        const dx = e.clientX - drag.x;
         const dy = e.clientY - drag.y;
-        if (!drag.moved && Math.abs(dy) < 5) return;
+        if (!drag.moved && Math.hypot(dx, dy) < 5) return;
         drag.moved = true;
-        placeTop(drag.top + dy);
-        if (isOpen()) position();
+        placeTrigger(drag.left + dx, drag.top + dy);
       },
-      onPointerUp: (e) => {
-        if (!drag || drag.id !== e.pointerId) return;
-        if (drag.moved) {
-          ui.top = parseFloat(barHost.style.top);
-          saveUi(ui);
-        } else drag = null;
-      },
+      onPointerUp: finishDrag,
+      onPointerCancel: finishDrag,
+      onLostPointerCapture: finishDrag,
     },
     h("span", { class: "logo", "aria-hidden": "true" }, "K"),
     h("span", { class: "lbl" }, "Scripts"),
     h("span", { class: "chev", "aria-hidden": "true" }, "▾"),
+  );
+  const detachButton = h("button", { type: "button", role: "menuitem", onClick: toggleDetached },
+    h("span", { class: "ic", "aria-hidden": "true" }, "↗"),
+    h("span", { class: "txt" }, "Détacher le menu"),
   );
   const menu = h(
     "div",
@@ -201,6 +203,7 @@
     h(
       "div",
       { class: "sec" },
+      detachButton,
       h(
         "button",
         {
@@ -219,21 +222,25 @@
       ),
     ),
   );
-  barRoot.append(h("style", {}, K.styles), h("div", { class: "bar" }, trigger, menu));
+  barRoot.append(h("style", {}, K.styles), trigger, menu);
 
   function toggleMenu(force = menu.hidden) {
     menu.hidden = !force;
-    trigger.setAttribute("aria-expanded", String(force));
-    if (force) menu.querySelector("button")?.focus();
+    trigger.setAttribute("aria-expanded", String(force && !detached));
+    if (force) {
+      position();
+      menu.querySelector("button")?.focus({ preventScroll: true });
+    }
   }
   // Clic ailleurs ou Échap : le menu se referme.
   document.addEventListener("pointerdown", (e) => {
-    if (!menu.hidden && !e.composedPath().includes(barHost)) toggleMenu(false);
+    if (!detached && !menu.hidden && !e.composedPath().includes(barHost)) toggleMenu(false);
   });
   menu.addEventListener("keydown", (e) => {
-    const items = [...menu.querySelectorAll("button")];
-    const i = items.indexOf(barRoot.activeElement);
+    const items = [...menu.querySelectorAll(detached ? "button:not(.collapse)" : "button")];
+    const i = items.indexOf(menu.getRootNode().activeElement);
     if (e.key === "Escape") {
+      if (detached) return reattach();
       toggleMenu(false);
       trigger.focus();
     } else if (e.key === "ArrowDown") {
@@ -275,19 +282,43 @@
 
   // ---------- Position du bouton ----------
   let drag = null;
+  let suppressClick = false;
   let ui = {};
-  function placeTop(top) {
-    barHost.style.top = `${Math.round(Math.min(Math.max(8, top), innerHeight - 44))}px`;
+  function clamp(value, max, margin = 8) {
+    return Math.min(Math.max(margin, value), Math.max(0, max - margin));
+  }
+  function placeTrigger(left, top) {
+    const { width, height } = trigger.getBoundingClientRect();
+    barHost.style.top = `${clamp(top, innerHeight - height)}px`;
+    if (Number.isFinite(left)) {
+      barHost.style.right = "auto";
+      barHost.style.left = `${clamp(left, innerWidth - width)}px`;
+    }
+    position();
+  }
+  function finishDrag(e) {
+    if (drag?.id !== e.pointerId) return;
+    suppressClick = drag.moved;
+    drag = null;
+    if (!suppressClick) return;
+    ui.left = parseFloat(barHost.style.left);
+    ui.top = parseFloat(barHost.style.top);
+    saveUi(ui);
   }
   function applyUi() {
-    if (typeof ui.top === "number") placeTop(ui.top);
     trigger.classList.toggle("mini", !!ui.collapsed);
+    placeTrigger(ui.left, Number.isFinite(ui.top) ? ui.top : 76);
   }
   loadUi().then((saved) => {
-    ui = saved;
-    applyUi();
+    if (!drag && !suppressClick) {
+      ui = { ...saved, ...ui };
+      applyUi();
+    }
   });
-  addEventListener("resize", () => typeof ui.top === "number" && placeTop(ui.top));
+  addEventListener("resize", () => {
+    if (drag?.moved) placeTrigger(parseFloat(barHost.style.left), parseFloat(barHost.style.top));
+    else applyUi();
+  });
 
   let scheduled = false;
   // Le site (SvelteKit) peut réécrire le body : on se remet en place si on a été retiré.
@@ -309,6 +340,58 @@
   popRoot.append(h("style", {}, K.styles), pop);
   document.body.append(popHost);
   const hasPopoverApi = typeof pop.showPopover === "function";
+  let detached = null;
+
+  function toggleDetached() {
+    if (detached) return reattach();
+    let popup;
+    try {
+      popup = window.open("about:blank", "_blank", "popup,width=760,height=740");
+      if (!popup) throw new Error();
+      const doc = popup.document;
+      doc.title = "Scripts Kyara";
+      doc.documentElement.lang = "fr";
+      doc.body.style.cssText = "margin:0; background:#17171f";
+      const base = doc.createElement("base");
+      base.href = location.origin + "/";
+      base.target = "_blank";
+      doc.head.append(base);
+      const host = doc.createElement("div");
+      host.className = "kx-detached";
+      const root = host.attachShadow({ mode: "open" });
+      const style = doc.createElement("style");
+      style.textContent = K.styles;
+      root.append(style);
+      doc.body.append(host);
+      if (hasPopoverApi && pop.matches(":popover-open")) pop.hidePopover();
+      detached = popup;
+      root.append(menu, pop);
+      Object.assign(menu.style, { left: "", top: "", bottom: "", maxHeight: "" });
+      Object.assign(pop.style, { left: "", top: "", bottom: "", maxHeight: "" });
+      detachButton.lastChild.textContent = "Rattacher le menu";
+      popup.addEventListener("pagehide", () => {
+        if (detached === popup) reattach(false);
+      }, { once: true });
+      toggleMenu(!isOpen());
+    } catch {
+      if (detached) reattach();
+      else popup?.close();
+      detachButton.lastChild.textContent = "Fenêtre bloquée · Réessayer";
+    }
+  }
+
+  function reattach(closeWindow = true) {
+    const popup = detached;
+    detached = null;
+    barRoot.append(menu);
+    popRoot.append(pop);
+    if (closeWindow) popup.close();
+    detachButton.lastChild.textContent = "Détacher le menu";
+    if (isOpen() && hasPopoverApi) pop.showPopover();
+    toggleMenu(!isOpen());
+    position();
+  }
+  addEventListener("pagehide", () => detached?.close());
 
   const isOpen = () => pop.classList.contains("open");
   function open(id) {
@@ -318,7 +401,7 @@
     render();
     if (!isOpen()) {
       pop.classList.add("open");
-      if (hasPopoverApi) pop.showPopover();
+      if (hasPopoverApi && !detached) pop.showPopover();
     }
     position();
     updateBar();
@@ -339,24 +422,27 @@
     pop.classList.remove("open");
     if (hasPopoverApi && pop.matches(":popover-open")) pop.hidePopover();
     updateBar();
-    trigger.focus();
+    if (detached) toggleMenu(true);
+    else trigger.focus();
   }
 
-  // Sous le menu, aligné à droite ; centré sur petit écran.
   function position() {
-    const vw = innerWidth,
-      vh = innerHeight;
-    const w = Math.min(pop.classList.contains("wide") ? 1000 : 640, vw - 32);
+    if (detached) return;
     const r = trigger.getBoundingClientRect();
-    const left = vw < 640 ? (vw - w) / 2 : Math.max(16, r.right - w);
-    const top = r.bottom + 8;
-    Object.assign(pop.style, {
-      left: `${left}px`,
-      top: `${top}px`,
-      maxHeight: `${Math.min(760, vh - top - 16)}px`,
-    });
+    const below = innerHeight - r.bottom - 16;
+    const above = r.top - 16;
+    for (const panel of [menu.hidden ? null : menu, isOpen() ? pop : null]) {
+      if (!panel) continue;
+      const up = above > below && (panel === pop || below < panel.scrollHeight);
+      const width = panel.getBoundingClientRect().width;
+      Object.assign(panel.style, {
+        left: `${clamp(r.right - width, innerWidth - width)}px`,
+        top: up ? "auto" : `${r.bottom + 8}px`,
+        bottom: up ? `${innerHeight - r.top + 8}px` : "auto",
+        maxHeight: `${Math.max(0, Math.min(760, up ? above : below))}px`,
+      });
+    }
   }
-  addEventListener("resize", () => isOpen() && position());
   pop.addEventListener("keydown", (e) => {
     if (e.key === "ArrowLeft" && e.altKey) {
       e.preventDefault();

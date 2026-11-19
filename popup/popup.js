@@ -51,7 +51,7 @@ async function check() {
     });
   }
   const running = status.running.length ? ` En cours : ${status.running.join(", ")}.` : "";
-  show("ok", "Active sur cet onglet", `${status.scripts} script(s) dans le menu « K Scripts » en haut à droite de la page.${running}`);
+  show("ok", "Active sur cet onglet", `${status.scripts} script(s) dans le menu de la bulle « K Scripts » sur la page.${running}`);
 }
 
 check().catch((e) => show("warn", "Erreur", e.message));
