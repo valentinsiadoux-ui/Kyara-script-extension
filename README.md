@@ -77,7 +77,7 @@ une carte plus chère, et ainsi de suite. Le site limite à 5 offres ouvertes : 
 **L'envoi reste manuel.**
 
 - Modes **Échange**, **Achat**, **Vente**, **Compléter** ; jusqu'à 20 cartes par côté, uniquement des doubles manquants.
-- Raretés à donner et à récupérer, plus une **rareté max** commune aux deux côtés.
+- Raretés à donner et à récupérer. En modes **Échange** et **Compléter**, une **rareté max** s’applique aux deux côtés.
 - Les inventaires sont vérifiés par l'API (`/trades/available`, `/trades/owned`) en plus des filtres du site ; s'il n'y a
   rien d'éligible, rien n'est chargé.
 - Les cartes déjà demandées dans les échanges envoyés en attente sont exclues des cartes reçues.
@@ -108,12 +108,6 @@ refuse tes messages ou si le message dépasse 300 caractères.
 **♻️ Recycler les doublons** — recycle les doublons dont la vente rapporterait moins que le recyclage (taxe et frais
 déduits), ou moins de « recyclage × N ». Hors épinglées, en vente ou en offre. Les cartes Épique ou plus rares sont
 décochées d'office : il faut les cocher exprès. Le recyclage est définitif.
-
-### Suivi
-
-**📋 Tableau de bord** — liste mes ventes, enchères, ordres d'achat et offres d'échange en cours (filtrables, avec
-leur fin). Tout est décoché : coche ce que tu veux retirer, puis « Confirmer et lancer ». Une enchère qui a reçu des
-mises ne peut plus être retirée.
 
 ## Structure
 
